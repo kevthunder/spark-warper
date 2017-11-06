@@ -33,7 +33,7 @@
       err = null;
       dependencyLines = [];
       startAt = null;
-      if ((start = /(\/\/|\/\*+)\s*dependencies\s*(\*+\/)?/i.exec(contents)) && (end = /(\/\/|\/\*+)\s*end\s*dependencies\s*(\*+\/)?/i.exec(contents))) {
+      if ((start = /(\/\/|\/\*+|###)\s*dependencies\s*(\*+\/|###)?/i.exec(contents)) && (end = /(\/\/|\/\*+|###)\s*end\s*dependencies\s*(\*+\/|###)?/i.exec(contents))) {
         dependencyLines = contents.substring(start.index + start[0].length, end.index).trim().split("\n");
         dependencyLines = dependencyLines.filter(function(line) {
           return line.trim() !== '';
@@ -97,21 +97,37 @@
         return cb(null, before + '\n' + contents + '\n' + after);
       });
     },
+    wrapPart: function(options, contents, cb) {
+      return fn.extractDependencies(contents, function(err, contents, dependencies) {
+        var after, before, dependency, j, len;
+        if (err) {
+          return cb(err);
+        }
+        before = fn.replaceOptions(options, "((definition)->\n  {{namespace}}.{{className}} = definition({{namespace}})\n  {{namespace}}.{{className}}.definition = definition\n)((dependencies={})->");
+        for (j = 0, len = dependencies.length; j < len; j++) {
+          dependency = dependencies[j];
+          before += '\n  {{name}} = dependencies.{{name}}'.replace(/\{\{name\}\}/g, dependency.name).replace(/\{\{def\}\}/g, dependency.def);
+        }
+        after = fn.replaceOptions(options, "  {{className}}\n)");
+        return cb(null, before + '\n' + contents.replace(/^/gm, "  ") + '\n' + after);
+      });
+    },
     doWrap: function(options, wrap) {
       return function(file, callback) {
-        var isBuffer, isStream;
+        var isBuffer, isStream, localOpt;
+        localOpt = Object.assign({}, options);
         isStream = file.contents && typeof file.contents.on === 'function' && typeof file.contents.pipe === 'function';
         isBuffer = file.contents instanceof Buffer;
-        if ((options != null ? options.namespace : void 0) == null) {
+        if ((localOpt != null ? localOpt.namespace : void 0) == null) {
           callback(new Error('spark-wraper: namespace needed'), file);
         }
         if (isStream) {
           return callback(new Error('spark-wraper: Streaming not supported'), file);
         } else if (isBuffer) {
-          if (options.className == null) {
-            options.className = path.basename(file.path, path.extname(file.path));
+          if (localOpt.className == null) {
+            localOpt.className = path.basename(file.path, path.extname(file.path));
           }
-          return wrap(options, String(file.contents), function(err, contents) {
+          return wrap(localOpt, String(file.contents), function(err, contents) {
             if (err) {
               return callback(err, file);
             }
