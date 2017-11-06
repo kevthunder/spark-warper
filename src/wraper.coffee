@@ -49,7 +49,7 @@ fn = {
     dependencies = dependencyLines.map (line)->
       match = line.match(/^((var|const)\s+)?(\w+)\s*=\s*/)
       unless match?
-        return err = new Error('spark-warper: malformated dependency :'+line)
+        return err = new Error('spark-wraper: malformated dependency :'+line)
       {
           name: match[3]
           def: line.substring(match[0].length)
@@ -86,9 +86,9 @@ fn = {
       isStream = file.contents and typeof file.contents.on == 'function' and typeof file.contents.pipe == 'function'
       isBuffer = file.contents instanceof Buffer
       if !options?.namespace?
-        callback(new Error('spark-warper: namespace needed'), file)
+        callback(new Error('spark-wraper: namespace needed'), file)
       if isStream
-        callback(new Error('spark-warper: Streaming not supported'), file)
+        callback(new Error('spark-wraper: Streaming not supported'), file)
       else if isBuffer
         unless options.className?
           options.className = path.basename(file.path,'.js')

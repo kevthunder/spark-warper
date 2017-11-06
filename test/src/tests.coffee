@@ -1,7 +1,7 @@
 assert = require('chai').assert
-wraper = require('../dist/spark-warper')
+wraper = require('../dist/spark-wraper')
 
-describe 'warper', ->
+describe 'wraper', ->
   it 'remove var def', ->
     contents = """
       var Foo, Bar;

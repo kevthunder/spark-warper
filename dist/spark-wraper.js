@@ -68,7 +68,7 @@
       dependencies = dependencyLines.map(function(line) {
         match = line.match(/^((var|const)\s+)?(\w+)\s*=\s*/);
         if (match == null) {
-          return err = new Error('spark-warper: malformated dependency :' + line);
+          return err = new Error('spark-wraper: malformated dependency :' + line);
         }
         return {
           name: match[3],
@@ -101,10 +101,10 @@
         isStream = file.contents && typeof file.contents.on === 'function' && typeof file.contents.pipe === 'function';
         isBuffer = file.contents instanceof Buffer;
         if ((options != null ? options.namespace : void 0) == null) {
-          callback(new Error('spark-warper: namespace needed'), file);
+          callback(new Error('spark-wraper: namespace needed'), file);
         }
         if (isStream) {
-          return callback(new Error('spark-warper: Streaming not supported'), file);
+          return callback(new Error('spark-wraper: Streaming not supported'), file);
         } else if (isBuffer) {
           if (options.className == null) {
             options.className = path.basename(file.path, '.js');

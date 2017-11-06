@@ -7,14 +7,14 @@ var mocha = require('gulp-mocha');
 gulp.task('coffee', function() {
   return gulp.src(['./src/wraper.coffee'])
     .pipe(coffee())
-    .pipe(rename('spark-warper.js'))
+    .pipe(rename('spark-wraper.js'))
     .pipe(gulp.dest('./dist/'));
 });
 
 gulp.task('compress', ['coffee'], function () {
-  return gulp.src('./dist/spark-warper.js')
+  return gulp.src('./dist/spark-wraper.js')
     .pipe(uglify())
-    .pipe(rename('spark-warper.min.js'))
+    .pipe(rename('spark-wraper.min.js'))
     .pipe(gulp.dest('./dist/'));
 });
 
@@ -34,7 +34,7 @@ gulp.task('test', ['coffee','coffeeTest'], function() {
 });
 
 gulp.task('test-task', ['coffee','coffeeTest'], function() {
-  var wraper = require('./dist/spark-warper');
+  var wraper = require('./dist/spark-wraper');
 
   return gulp.src('./test/TestClass.js')
     .pipe(wraper({namespace:'Spark'}))
