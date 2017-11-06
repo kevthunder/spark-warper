@@ -3,9 +3,9 @@
 
   assert = require('chai').assert;
 
-  wraper = require('../dist/spark-warper');
+  wraper = require('../dist/spark-wraper');
 
-  describe('warper', function() {
+  describe('wraper', function() {
     it('remove var def', function() {
       var contents;
       contents = "var Foo, Bar;\n// comment";
