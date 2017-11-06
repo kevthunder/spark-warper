@@ -1,0 +1,28 @@
+{
+  "name": "spark-warper",
+  "version": "0.1.0",
+  "description": "Wrap your class for exporting with gulp",
+  "main": "dist/spark-warper.js",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/kevthunder/spark-warper.git"
+  },
+  "scripts": {
+    "test": "gulp test",
+    "build": "gulp build"
+  },
+  "author": "kevthunder",
+  "license": "ISC",
+  "devDependencies": {
+    "chai": "^3.5.0",
+    "gulp": "^3.9.1",
+    "gulp-coffee": "^2.3.3",
+    "gulp-mocha": "^4.3.0",
+    "gulp-rename": "^1.2.2",
+    "gulp-uglify": "^2.0.1",
+    "mocha": "^3.2.0"
+  },
+  "dependencies": {
+    "event-stream": "^3.3.4"
+  }
+}
