@@ -14,7 +14,6 @@
         if (end !== ';') {
           end = curVars.pop() + end;
         }
-        console.log(curVars);
         curVars = curVars.filter(function(varname) {
           return !vars.includes(varname);
         });
@@ -48,7 +47,7 @@
           line = lines[i];
           if (match = line.match(/^((var|const)\s+)?(\w+)\s*=.*require.*$/)) {
             if (dependencyLines.length === 0) {
-              startAt = line.slice(0, i).join("\n").length;
+              startAt = lines.slice(0, i).join("\n").length;
             }
             dependencyLines.push(line);
             lines.splice(i, 1);
@@ -80,22 +79,25 @@
       }), startAt);
       return cb(err, contents, dependencies);
     },
+    replaceOptions: function(options, contents) {
+      return contents.replace(/\{\{className\}\}/g, options.className).replace(/\{\{namespace\}\}/g, options.namespace);
+    },
     wrap: function(options, contents, cb) {
       return fn.extractDependencies(contents, function(err, contents, dependencies) {
         var after, before, dependency, j, len;
         if (err) {
           return cb(err);
         }
-        before = 'definition = function(dependencies) {';
+        before = fn.replaceOptions(options, '(function(definition){ {{className}} = definition(typeof({{namespace}}) !== "undefined"?{{namespace}}:this.{{namespace}}); {{className}}.definition = definition; if (typeof(module) !== "undefined" && module !== null) { module.exports = {{className}}; } else { if (typeof({{namespace}}) !== "undefined" && {{namespace}} !== null) { {{namespace}}.Tile.{{className}} = {{className}}; } else{ if (this.{{namespace}} == null) { this.{{namespace}} = {}; } this.{{namespace}}.Tile.{{className}} = {{className}}; } } })(function(dependencies) {if(dependencies==null){dependencies={};}').replace(/\s/g, '');
         for (j = 0, len = dependencies.length; j < len; j++) {
           dependency = dependencies[j];
-          before += 'var {{name}} = dependencies != null && dependencies.{{name}} == null ? dependencies.{{name}} : {{def}}'.replace(/\{\{name\}\}/g, dependency.name).replace(/\{\{def\}\}/g, dependency.def);
+          before += '\nvar {{name}} = dependencies.hasOwnProperty("{{name}}") ? dependencies.{{name}} : {{def}}'.replace(/\{\{name\}\}/g, dependency.name).replace(/\{\{def\}\}/g, dependency.def);
         }
-        after = '{{className}} = definition({{namespace}} || this.{{namespace}}); {{className}}.definition = definition; if (typeof({{namespace}}) !== "undefined" && {{namespace}} !== null) { {{namespace}}.Tile.{{className}} = {{className}}; } if (typeof(module) !== "undefined" && module !== null) { module.exports = {{className}}; } else { if (this.{{namespace}} == null) { this.{{namespace}} = {}; } this.{{namespace}}.Tile.{{className}} = {{className}}; }'.replace(/\{\{className\}\}/g, options.className).replace(/\{\{namespace\}\}/g, options.namespace).replace(/\s/g, '');
+        after = fn.replaceOptions(options, 'return({{className}}); });').replace(/\s/g, '');
         return cb(null, before + '\n' + contents + '\n' + after);
       });
     },
-    doWrap: function(options) {
+    doWrap: function(options, wrap) {
       return function(file, callback) {
         var isBuffer, isStream;
         isStream = file.contents && typeof file.contents.on === 'function' && typeof file.contents.pipe === 'function';
@@ -107,9 +109,9 @@
           return callback(new Error('spark-wraper: Streaming not supported'), file);
         } else if (isBuffer) {
           if (options.className == null) {
-            options.className = path.basename(file.path, '.js');
+            options.className = path.basename(file.path, path.extname(file.path));
           }
-          return fn.wrap(options, String(file.contents), function(err, contents) {
+          return wrap(options, String(file.contents), function(err, contents) {
             if (err) {
               return callback(err, file);
             }
@@ -124,7 +126,11 @@
   };
 
   module.exports = function(options) {
-    return es.map(fn.doWrap(options));
+    return es.map(fn.doWrap(options, fn.wrap));
+  };
+
+  module.exports.wrapPart = function(options) {
+    return es.map(fn.doWrap(options, fn.wrapPart));
   };
 
   module.exports.fn = fn;
