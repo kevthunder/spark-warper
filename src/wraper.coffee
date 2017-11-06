@@ -9,7 +9,6 @@ fn = {
       curVars = varsMatch[1].split(/,\s*/)
       if end != ';'
         end = curVars.pop() + end
-      console.log(curVars)
       curVars = curVars.filter (varname)->
         !vars.includes(varname)
       if end != ';' && curVars.length > 0
@@ -19,6 +18,7 @@ fn = {
         replace = ''
       contents = contents.substring(0,varsMatch.index) + replace + contents.substring(varsMatch.index+varsMatch[0].length)
     contents
+
   extractDependencies: (contents, cb) ->
     err = null
     dependencyLines = []
@@ -36,7 +36,7 @@ fn = {
         line = lines[i]
         if match = line.match(/^((var|const)\s+)?(\w+)\s*=.*require.*$/)
           if dependencyLines.length == 0
-            startAt = line.slice(0,i).join("\n").length
+            startAt = lines.slice(0,i).join("\n").length
           dependencyLines.push(line)
           lines.splice(i,1)
         if line.trim() == ''
@@ -56,32 +56,44 @@ fn = {
       }
     contents = fn.removeVarDef(contents,dependencies.map((dep)->dep.name),startAt)
     cb(err,contents,dependencies)
+
+  replaceOptions: (options, contents) ->
+    contents.replace(/\{\{className\}\}/g,options.className).replace(/\{\{namespace\}\}/g,options.namespace)
+
   wrap: (options, contents, cb) ->
     fn.extractDependencies contents, (err, contents,dependencies)->
       if err
         return cb(err)
-      before = 'definition = function(dependencies) {'
-      for dependency in dependencies
-        before += 'var {{name}} = dependencies != null && dependencies.{{name}} == null ? dependencies.{{name}} : {{def}}'
-          .replace(/\{\{name\}\}/g,dependency.name).replace(/\{\{def\}\}/g,dependency.def)
-      after = '
-        {{className}} = definition({{namespace}} || this.{{namespace}});
-        {{className}}.definition = definition;
-        if (typeof({{namespace}}) !== "undefined" && {{namespace}} !== null) {
-          {{namespace}}.Tile.{{className}} = {{className}};
-        }
-        if (typeof(module) !== "undefined" && module !== null) {
-          module.exports = {{className}};
-        } else {
-          if (this.{{namespace}} == null) {
-            this.{{namespace}} = {};
+      before = fn.replaceOptions(options,'(function(definition){
+          {{className}} = definition(typeof({{namespace}}) !== "undefined"?{{namespace}}:this.{{namespace}});
+          {{className}}.definition = definition;
+          if (typeof(module) !== "undefined" && module !== null) {
+            module.exports = {{className}};
+          } else {
+            if (typeof({{namespace}}) !== "undefined" && {{namespace}} !== null) {
+              {{namespace}}.Tile.{{className}} = {{className}};
+            } else{
+              if (this.{{namespace}} == null) {
+                this.{{namespace}} = {};
+              }
+              this.{{namespace}}.Tile.{{className}} = {{className}};
+            }
           }
-          this.{{namespace}}.Tile.{{className}} = {{className}};
-        }
-      '.replace(/\{\{className\}\}/g,options.className).replace(/\{\{namespace\}\}/g,options.namespace).replace(/\s/g,'')
+        })(function(dependencies) {if(dependencies==null){dependencies={};}
+      ').replace(/\s/g,'')
+      for dependency in dependencies
+        before += '\nvar {{name}} = dependencies.hasOwnProperty("{{name}}") ? dependencies.{{name}} : {{def}}'
+          .replace(/\{\{name\}\}/g,dependency.name).replace(/\{\{def\}\}/g,dependency.def)
+      after = fn.replaceOptions(options,'
+          return({{className}});
+        });
+      ').replace(/\s/g,'')
       cb(null, before + '\n' + contents + '\n' + after)
 
-  doWrap: (options) ->
+
+
+
+  doWrap: (options,wrap) ->
     (file, callback) ->
       isStream = file.contents and typeof file.contents.on == 'function' and typeof file.contents.pipe == 'function'
       isBuffer = file.contents instanceof Buffer
@@ -91,8 +103,8 @@ fn = {
         callback(new Error('spark-wraper: Streaming not supported'), file)
       else if isBuffer
         unless options.className?
-          options.className = path.basename(file.path,'.js')
-        fn.wrap options, String(file.contents), (err, contents)->
+          options.className = path.basename(file.path,path.extname(file.path))
+        wrap options, String(file.contents), (err, contents)->
           if err
             return callback(err, file)
           file.contents = new Buffer(contents)
@@ -102,5 +114,7 @@ fn = {
 }
 
 module.exports = (options) ->
-  es.map fn.doWrap(options)
+  es.map fn.doWrap(options, fn.wrap)
+module.exports.wrapPart = (options) ->
+  es.map fn.doWrap(options, fn.wrapPart)
 module.exports.fn = fn
