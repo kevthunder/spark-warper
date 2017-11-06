@@ -5,11 +5,16 @@ wraper = require('../dist/spark-wraper')
 gulp = require('gulp')
 fs = require('fs')
 path = require('path')
+merge = require('merge2')
+coffee = require('gulp-coffee')
+concat = require('gulp-concat')
 
 emptyFolder = (directory,cb)->
   fs.readdir directory, (err, files) ->
     if err
-      cb(err)
+      return cb(err)
+    if files.length == 0
+      return cb()
     done = 0
     for file in files
       fs.unlink path.join(directory, file), (err) ->
@@ -142,3 +147,30 @@ describe 'wraper', ->
           obj = new TestClass2()
           assert.equal obj.test(), 'bye'
           done()
+
+    it 'wrap file part', (done)->
+      assert.notPathExists('./test/output/TestClass3.coffee')
+      gulp.src('./test/files/TestClass3.coffee')
+        .pipe(wraper.wrapPart({namespace:'Spark'}))
+        .pipe(gulp.dest('./test/output/'))
+        .on 'end', ->
+          assert.pathExists('./test/output/TestClass3.coffee')
+          done()
+
+    it 'wrap file in parts', (done)->
+      assert.notPathExists('./test/output/spark.js')
+      merge(
+         gulp.src('./test/files/_start.coffee'),
+         gulp.src(['./test/files/TestClass3.coffee','./test/files/TestClass4.coffee'])
+          .pipe(wraper.wrapPart({namespace:'Spark'})),
+         gulp.src('./test/files/_end.coffee'),
+      )
+      .pipe(concat('spark.coffee'))
+      .pipe(coffee())
+      .pipe(gulp.dest('./test/output/'))
+      .on 'end', ->
+        assert.pathExists('./test/output/spark.js')
+        Spark = require('./output/spark.js')
+        assert.isFunction(Spark.TestClass3)
+        assert.isFunction(Spark.TestClass3.definition)
+        done()

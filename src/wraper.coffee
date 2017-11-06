@@ -23,7 +23,7 @@ fn = {
     err = null
     dependencyLines = []
     startAt = null
-    if (start = /(\/\/|\/\*+)\s*dependencies\s*(\*+\/)?/i.exec(contents)) && (end = /(\/\/|\/\*+)\s*end\s*dependencies\s*(\*+\/)?/i.exec(contents))
+    if (start = /(\/\/|\/\*+|###)\s*dependencies\s*(\*+\/|###)?/i.exec(contents)) && (end = /(\/\/|\/\*+|###)\s*end\s*dependencies\s*(\*+\/|###)?/i.exec(contents))
       dependencyLines = contents.substring(start.index+start[0].length,end.index).trim().split("\n")
       dependencyLines = dependencyLines.filter (line)->
         line.trim() != ''
@@ -91,20 +91,38 @@ fn = {
       cb(null, before + '\n' + contents + '\n' + after)
 
 
+  wrapPart: (options, contents, cb) ->
+    fn.extractDependencies contents, (err, contents,dependencies)->
+      if err
+        return cb(err)
+      before = fn.replaceOptions(options,"""((definition)->
+          {{namespace}}.{{className}} = definition({{namespace}})
+          {{namespace}}.{{className}}.definition = definition
+        )((dependencies={})->
+      """)
+      for dependency in dependencies
+        before += '\n  {{name}} = dependencies.{{name}}'
+          .replace(/\{\{name\}\}/g,dependency.name).replace(/\{\{def\}\}/g,dependency.def)
+      after = fn.replaceOptions(options,"""
+          {{className}}
+        )
+      """)
+      cb(null, before + '\n' + contents.replace(/^/gm, "  ") + '\n' + after)
 
 
   doWrap: (options,wrap) ->
     (file, callback) ->
+      localOpt = Object.assign({},options)
       isStream = file.contents and typeof file.contents.on == 'function' and typeof file.contents.pipe == 'function'
       isBuffer = file.contents instanceof Buffer
-      if !options?.namespace?
+      if !localOpt?.namespace?
         callback(new Error('spark-wraper: namespace needed'), file)
       if isStream
         callback(new Error('spark-wraper: Streaming not supported'), file)
       else if isBuffer
-        unless options.className?
-          options.className = path.basename(file.path,path.extname(file.path))
-        wrap options, String(file.contents), (err, contents)->
+        unless localOpt.className?
+          localOpt.className = path.basename(file.path,path.extname(file.path))
+        wrap localOpt, String(file.contents), (err, contents)->
           if err
             return callback(err, file)
           file.contents = new Buffer(contents)

@@ -1,5 +1,5 @@
 (function() {
-  var assert, chai, emptyFolder, fs, gulp, path, wraper;
+  var assert, chai, coffee, concat, emptyFolder, fs, gulp, merge, path, wraper;
 
   chai = require('chai');
 
@@ -15,11 +15,20 @@
 
   path = require('path');
 
+  merge = require('merge2');
+
+  coffee = require('gulp-coffee');
+
+  concat = require('gulp-concat');
+
   emptyFolder = function(directory, cb) {
     return fs.readdir(directory, function(err, files) {
       var done, file, i, len, results;
       if (err) {
-        cb(err);
+        return cb(err);
+      }
+      if (files.length === 0) {
+        return cb();
       }
       done = 0;
       results = [];
@@ -143,7 +152,7 @@
           return done();
         });
       });
-      return it('allow dependency override', function(done) {
+      it('allow dependency override', function(done) {
         assert.notPathExists('./test/output/TestClass2.js');
         return gulp.src('./test/files/TestClass2.js').pipe(wraper({
           namespace: 'Spark'
@@ -159,6 +168,28 @@
           });
           obj = new TestClass2();
           assert.equal(obj.test(), 'bye');
+          return done();
+        });
+      });
+      it('wrap file part', function(done) {
+        assert.notPathExists('./test/output/TestClass3.coffee');
+        return gulp.src('./test/files/TestClass3.coffee').pipe(wraper.wrapPart({
+          namespace: 'Spark'
+        })).pipe(gulp.dest('./test/output/')).on('end', function() {
+          assert.pathExists('./test/output/TestClass3.coffee');
+          return done();
+        });
+      });
+      return it('wrap file in parts', function(done) {
+        assert.notPathExists('./test/output/spark.js');
+        return merge(gulp.src('./test/files/_start.coffee'), gulp.src(['./test/files/TestClass3.coffee', './test/files/TestClass4.coffee']).pipe(wraper.wrapPart({
+          namespace: 'Spark'
+        })), gulp.src('./test/files/_end.coffee')).pipe(concat('spark.coffee')).pipe(coffee()).pipe(gulp.dest('./test/output/')).on('end', function() {
+          var Spark;
+          assert.pathExists('./test/output/spark.js');
+          Spark = require('./output/spark.js');
+          assert.isFunction(Spark.TestClass3);
+          assert.isFunction(Spark.TestClass3.definition);
           return done();
         });
       });

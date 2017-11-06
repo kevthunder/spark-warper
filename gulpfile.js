@@ -33,13 +33,4 @@ gulp.task('test', ['coffee','coffeeTest'], function() {
     .pipe(mocha());
 });
 
-gulp.task('test-task', ['coffee','coffeeTest'], function() {
-  var wraper = require('./dist/spark-wraper');
-
-  return gulp.src('./test/TestClass.js')
-    .pipe(wraper({namespace:'Spark'}))
-    .pipe(gulp.dest('./test/output/'));
-});
-
-
 gulp.task('default', ['build']);
