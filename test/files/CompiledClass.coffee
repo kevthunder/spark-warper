@@ -2,6 +2,6 @@
 out = 'hello'
 ### end dependencies ###
 
-class TestClass3
+class CompiledClass
   hello: ->
     out

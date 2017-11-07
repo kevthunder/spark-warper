@@ -1,5 +1,6 @@
-es = require('event-stream')
+through = require('through2')
 path = require('path');
+Promise = require('bluebird');
 
 
 fn = {
@@ -19,7 +20,7 @@ fn = {
       contents = contents.substring(0,varsMatch.index) + replace + contents.substring(varsMatch.index+varsMatch[0].length)
     contents
 
-  extractDependencies: (contents, cb) ->
+  extractDependencies: (contents) ->
     err = null
     dependencyLines = []
     startAt = null
@@ -49,22 +50,25 @@ fn = {
     dependencies = dependencyLines.map (line)->
       match = line.match(/^((var|const)\s+)?(\w+)\s*=\s*/)
       unless match?
-        return err = new Error('spark-wraper: malformated dependency :'+line)
+        throw new Error('spark-wraper: malformated dependency :'+line)
       {
           name: match[3]
           def: line.substring(match[0].length)
       }
     contents = fn.removeVarDef(contents,dependencies.map((dep)->dep.name),startAt)
-    cb(err,contents,dependencies)
+    {contents:contents, dependencies:dependencies}
 
   replaceOptions: (options, contents) ->
     contents.replace(/\{\{className\}\}/g,options.className).replace(/\{\{namespace\}\}/g,options.namespace)
 
-  wrap: (options, contents, cb) ->
-    fn.extractDependencies contents, (err, contents,dependencies)->
-      if err
-        return cb(err)
-      before = fn.replaceOptions(options,'(function(definition){
+  wrap: (options, contents) ->
+    dependencies = []
+    Promise.resolve().then ->
+      res = fn.extractDependencies(contents)
+      contents = res.contents
+      dependencies = res.dependencies
+    .then ->
+      before = '(function(definition){
           {{className}} = definition(typeof({{namespace}}) !== "undefined"?{{namespace}}:this.{{namespace}});
           {{className}}.definition = definition;
           if (typeof(module) !== "undefined" && module !== null) {
@@ -79,39 +83,26 @@ fn = {
               this.{{namespace}}.Tile.{{className}} = {{className}};
             }
           }
-        })(function(dependencies) {if(dependencies==null){dependencies={};}
-      ').replace(/\s/g,'')
-      for dependency in dependencies
-        before += '\nvar {{name}} = dependencies.hasOwnProperty("{{name}}") ? dependencies.{{name}} : {{def}}'
-          .replace(/\{\{name\}\}/g,dependency.name).replace(/\{\{def\}\}/g,dependency.def)
+        })(
+      '
+      before = fn.replaceOptions(options,before).replace(/\s/g,'')
+      if dependencies.length
+        before += 'function(dependencies){if(dependencies==null){dependencies={};}'
+        for dependency in dependencies
+          before += '\nvar {{name}} = dependencies.hasOwnProperty("{{name}}") ? dependencies.{{name}} : {{def}}'
+            .replace(/\{\{name\}\}/g,dependency.name).replace(/\{\{def\}\}/g,dependency.def)
+      else
+        before += 'function(){'
+
       after = fn.replaceOptions(options,'
           return({{className}});
         });
       ').replace(/\s/g,'')
-      cb(null, before + '\n' + contents + '\n' + after)
-
-
-  wrapPart: (options, contents, cb) ->
-    fn.extractDependencies contents, (err, contents,dependencies)->
-      if err
-        return cb(err)
-      before = fn.replaceOptions(options,"""((definition)->
-          {{namespace}}.{{className}} = definition({{namespace}})
-          {{namespace}}.{{className}}.definition = definition
-        )((dependencies={})->
-      """)
-      for dependency in dependencies
-        before += '\n  {{name}} = dependencies.{{name}}'
-          .replace(/\{\{name\}\}/g,dependency.name).replace(/\{\{def\}\}/g,dependency.def)
-      after = fn.replaceOptions(options,"""
-          {{className}}
-        )
-      """)
-      cb(null, before + '\n' + contents.replace(/^/gm, "  ") + '\n' + after)
-
+      before + '\n' + contents + '\n' + after
 
   doWrap: (options,wrap) ->
-    (file, callback) ->
+    (file, enc, callback) ->
+      stream = this
       localOpt = Object.assign({},options)
       isStream = file.contents and typeof file.contents.on == 'function' and typeof file.contents.pipe == 'function'
       isBuffer = file.contents instanceof Buffer
@@ -122,17 +113,100 @@ fn = {
       else if isBuffer
         unless localOpt.className?
           localOpt.className = path.basename(file.path,path.extname(file.path))
-        wrap localOpt, String(file.contents), (err, contents)->
-          if err
-            return callback(err, file)
+        wrap(localOpt, String(file.contents)).then (contents)->
           file.contents = new Buffer(contents)
-          callback(null, file)
+          file
+        .asCallback(callback)
       else
         callback null, file
 }
 
+class Composer
+  constructor: (options)->
+    @options = Object.assign({},options)
+    @files = []
+    @processed = []
+  collect: (file, stream)->
+    @files.push(file)
+    Promise.resolve()
+  processFile: (file, stream)->
+    index = @files.indexOf(file)
+    if index > -1
+      @wrapFile(file, stream).then (file)=>
+        @files.splice(index, 1)
+        stream.push(file)
+        @processed.push(file)
+        file
+    else
+      Promise.reject(new Error('this file is not in the stream'))
+  getProcessedFile: (path, stream)->
+    Promise.resolve().then =>
+      if file = @files.find((file)->file.path == path)
+        @processFile(file,stream)
+      else if file = @processed.find((file)->file.path == path)
+        file
+  resolveDependency: (dependency, file, stream)->
+    Promise.resolve().then =>
+      if match = /require(\(|\s*)['"]([^'"]+)['"]\)?/.exec(dependency.def)
+        dependencyPath = path.resolve(path.dirname(file.path)+'/'+match[2]+path.extname(file.path))
+        @getProcessedFile(dependencyPath, stream).then (dependencyFile)=>
+          if dependencyFile
+            dependency.def = dependency.def.replace(match[0],dependencyFile.wraped.namespace+'.'+dependencyFile.wraped.className)
+    .then =>
+      fn.replaceOptions(@options,'\n  {{name}} = if dependencies.hasOwnProperty("{{name}}") then dependencies.{{name}} else {{def}}'
+        .replace(/\{\{def\}\}/g,dependency.def).replace(/\{\{name\}\}/g,dependency.name))
+  wrapFile: (file, stream)->
+    Promise.resolve().then =>
+      unless file.wraped?
+        file.wraped = {
+          className: path.basename(file.path,path.extname(file.path))
+          namespace: @options.namespace
+        }
+        contents = String(file.contents)
+        res = fn.extractDependencies(contents)
+        contents = res.contents
+        dependencies = res.dependencies
+
+        before = """((definition)->
+            {{namespace}}.{{className}} = definition()
+            {{namespace}}.{{className}}.definition = definition
+          )("""
+        if dependencies.length
+          before += '(dependencies={})->'
+        else
+          before += '->'
+        before = fn.replaceOptions(file.wraped,before)
+
+        Promise.map(dependencies, (dependency)=>@resolveDependency(dependency,file, stream)).then (dependencies)=>
+          for dependency in dependencies
+            before += dependency
+
+
+          after = fn.replaceOptions(file.wraped,"""
+              {{className}}
+            )
+          """)
+
+          contents = before + '\n' + contents.replace(/^/gm, "  ") + '\n' + after
+          file.contents = new Buffer(contents)
+    .then =>
+      file
+    
+
+  compose: (stream)->
+    if @files.length
+      @processFile(@files[0],stream).then =>
+        @compose(stream)
+  getStream: ->
+    _this = this
+    through.obj (file, enc, cb) ->
+      _this.collect(file,this).asCallback(cb)
+    , (cb)->
+      _this.compose(this).asCallback(cb)
+
 module.exports = (options) ->
-  es.map fn.doWrap(options, fn.wrap)
-module.exports.wrapPart = (options) ->
-  es.map fn.doWrap(options, fn.wrapPart)
+  through.obj fn.doWrap(options, fn.wrap)
+module.exports.compose = (options) ->
+  composer = new Composer(options)
+  composer.getStream()
 module.exports.fn = fn

@@ -75,121 +75,125 @@
         contents = wraper.fn.removeVarDef(contents, ['Foo', 'Bar'], contents.length);
         return assert.equal(contents.trim(), "var Baz, FooBar = 'lol';\n// comment");
       });
-      it('extract dependecies with comments', function(done) {
-        var contents;
+      it('extract dependecies with comments', function() {
+        var contents, res;
         contents = "/* dependencies */\nvar Path = require('path');\n\nvar hello = 'hello';\n/* end dependencies */\n\nvar test = hello;";
-        return wraper.fn.extractDependencies(contents, function(err, contents, dependencies) {
-          if (err) {
-            return done(err);
+        res = wraper.fn.extractDependencies(contents);
+        assert.deepEqual(res.dependencies, [
+          {
+            name: 'Path',
+            def: "require('path');"
+          }, {
+            name: 'hello',
+            def: "'hello';"
           }
-          assert.deepEqual(dependencies, [
-            {
-              name: 'Path',
-              def: "require('path');"
-            }, {
-              name: 'hello',
-              def: "'hello';"
-            }
-          ]);
-          assert.equal(contents.trim(), 'var test = hello;');
-          return done();
-        });
+        ]);
+        return assert.equal(res.contents.trim(), 'var test = hello;');
       });
-      it('extract dependecies without comments', function(done) {
-        var contents;
+      it('extract dependecies without comments', function() {
+        var contents, res;
         contents = "\nvar Foo = require('foo');\n\nvar Bar = require('bar');\n\nvar test = Foo(Bar);";
-        return wraper.fn.extractDependencies(contents, function(err, contents, dependencies) {
-          if (err) {
-            return done(err);
+        res = wraper.fn.extractDependencies(contents);
+        assert.deepEqual(res.dependencies, [
+          {
+            name: 'Foo',
+            def: "require('foo');"
+          }, {
+            name: 'Bar',
+            def: "require('bar');"
           }
-          assert.deepEqual(dependencies, [
-            {
-              name: 'Foo',
-              def: "require('foo');"
-            }, {
-              name: 'Bar',
-              def: "require('bar');"
-            }
-          ]);
-          assert.equal(contents.trim(), 'var test = Foo(Bar);');
-          return done();
-        });
+        ]);
+        return assert.equal(res.contents.trim(), 'var test = Foo(Bar);');
       });
-      return it('extract dependecies with var before', function(done) {
-        var contents;
+      return it('extract dependecies with var before', function() {
+        var contents, res;
         contents = "var Foo, Bar;\nFoo = require('foo');\n\nBar = require('bar');\n\nvar test = Foo(Bar);";
-        return wraper.fn.extractDependencies(contents, function(err, contents, dependencies) {
-          if (err) {
-            return done(err);
+        res = wraper.fn.extractDependencies(contents);
+        assert.deepEqual(res.dependencies, [
+          {
+            name: 'Foo',
+            def: "require('foo');"
+          }, {
+            name: 'Bar',
+            def: "require('bar');"
           }
-          assert.deepEqual(dependencies, [
-            {
-              name: 'Foo',
-              def: "require('foo');"
-            }, {
-              name: 'Bar',
-              def: "require('bar');"
-            }
-          ]);
-          assert.equal(contents.trim(), 'var test = Foo(Bar);');
-          return done();
-        });
+        ]);
+        return assert.equal(res.contents.trim(), 'var test = Foo(Bar);');
       });
     });
     return describe('compile', function() {
       beforeEach(function(done) {
+        var file, i, len, outputCached, outputPath;
+        outputPath = path.resolve('./test/output/');
+        outputCached = Object.keys(require.cache).filter(function(path) {
+          return path.includes(outputPath);
+        });
+        for (i = 0, len = outputCached.length; i < len; i++) {
+          file = outputCached[i];
+          delete require.cache[file];
+        }
         return emptyFolder('./test/output/', done);
       });
       it('wrap file', function(done) {
-        assert.notPathExists('./test/output/TestClass.js');
-        return gulp.src('./test/files/TestClass.js').pipe(wraper({
+        assert.notPathExists('./test/output/BasicClass.js');
+        return gulp.src('./test/files/BasicClass.js').pipe(wraper({
           namespace: 'Spark'
         })).pipe(gulp.dest('./test/output/')).on('end', function() {
-          var TestClass;
-          assert.pathExists('./test/output/TestClass.js');
-          TestClass = require('./output/TestClass.js');
-          assert.isFunction(TestClass.definition);
+          var BasicClass;
+          assert.pathExists('./test/output/BasicClass.js');
+          BasicClass = require('./output/BasicClass.js');
+          assert.isFunction(BasicClass.definition);
+          return done();
+        });
+      });
+      it('wrap no dependency file', function(done) {
+        assert.notPathExists('./test/output/NoDependencyClass.js');
+        return gulp.src('./test/files/NoDependencyClass.js').pipe(wraper({
+          namespace: 'Spark'
+        })).pipe(gulp.dest('./test/output/')).on('end', function() {
+          var NoDependencyClass, obj;
+          assert.pathExists('./test/output/NoDependencyClass.js');
+          NoDependencyClass = require('./output/NoDependencyClass.js');
+          assert.isFunction(NoDependencyClass.definition);
+          assert.equal(NoDependencyClass.definition.length, 0);
+          obj = new NoDependencyClass();
+          assert.equal(obj.hello(), 'hello');
           return done();
         });
       });
       it('allow dependency override', function(done) {
-        assert.notPathExists('./test/output/TestClass2.js');
-        return gulp.src('./test/files/TestClass2.js').pipe(wraper({
+        assert.notPathExists('./test/output/CommentedClass.js');
+        return gulp.src('./test/files/CommentedClass.js').pipe(wraper({
           namespace: 'Spark'
         })).pipe(gulp.dest('./test/output/')).on('end', function() {
-          var TestClass2, obj;
-          assert.pathExists('./test/output/TestClass2.js');
-          TestClass2 = require('./output/TestClass2.js');
-          assert.isFunction(TestClass.definition);
-          obj = new TestClass2();
+          var CommentedClass, obj;
+          assert.pathExists('./test/output/CommentedClass.js');
+          CommentedClass = require('./output/CommentedClass.js');
+          assert.isFunction(CommentedClass.definition);
+          obj = new CommentedClass();
           assert.equal(obj.test(), 'hello');
-          TestClass2 = TestClass2.definition({
+          CommentedClass = CommentedClass.definition({
             out: 'bye'
           });
-          obj = new TestClass2();
+          obj = new CommentedClass();
           assert.equal(obj.test(), 'bye');
           return done();
         });
       });
-      it('wrap file part', function(done) {
-        assert.notPathExists('./test/output/TestClass3.coffee');
-        return gulp.src('./test/files/TestClass3.coffee').pipe(wraper.wrapPart({
-          namespace: 'Spark'
-        })).pipe(gulp.dest('./test/output/')).on('end', function() {
-          assert.pathExists('./test/output/TestClass3.coffee');
-          return done();
-        });
-      });
-      return it('wrap file in parts', function(done) {
+      return it('compose and concat files', function(done) {
         assert.notPathExists('./test/output/spark.js');
-        return merge(gulp.src('./test/files/_start.coffee'), gulp.src(['./test/files/TestClass3.coffee', './test/files/TestClass4.coffee']).pipe(wraper.wrapPart({
+        return merge(gulp.src('./test/files/_start.coffee'), gulp.src(['./test/files/DependantClass.coffee', './test/files/CompiledClass.coffee']).pipe(wraper.compose({
           namespace: 'Spark'
         })), gulp.src('./test/files/_end.coffee')).pipe(concat('spark.coffee')).pipe(coffee()).pipe(gulp.dest('./test/output/')).on('end', function() {
-          var Spark;
+          var Spark, obj;
           assert.pathExists('./test/output/spark.js');
           Spark = require('./output/spark.js');
-          assert.isFunction(Spark.TestClass3);
-          assert.isFunction(Spark.TestClass3.definition);
+          assert.isFunction(Spark.CompiledClass);
+          assert.isFunction(Spark.CompiledClass.definition);
+          obj = new Spark.CompiledClass();
+          assert.equal(obj.hello(), 'hello', 'CompiledClass::hello');
+          obj = new Spark.DependantClass();
+          assert.equal(obj.hello(), 'hello', 'DependantClass::hello');
           return done();
         });
       });
