@@ -1,9 +1,11 @@
 (function() {
-  var es, fn, path;
+  var Composer, Promise, fn, path, through;
 
-  es = require('event-stream');
+  through = require('through2');
 
   path = require('path');
+
+  Promise = require('bluebird');
 
   fn = {
     removeVarDef: function(contents, vars, limit) {
@@ -28,7 +30,7 @@
       }
       return contents;
     },
-    extractDependencies: function(contents, cb) {
+    extractDependencies: function(contents) {
       var dependencies, dependencyLines, end, err, i, line, lines, match, start, startAt;
       err = null;
       dependencyLines = [];
@@ -67,7 +69,7 @@
       dependencies = dependencyLines.map(function(line) {
         match = line.match(/^((var|const)\s+)?(\w+)\s*=\s*/);
         if (match == null) {
-          return err = new Error('spark-wraper: malformated dependency :' + line);
+          throw new Error('spark-wraper: malformated dependency :' + line);
         }
         return {
           name: match[3],
@@ -77,44 +79,43 @@
       contents = fn.removeVarDef(contents, dependencies.map(function(dep) {
         return dep.name;
       }), startAt);
-      return cb(err, contents, dependencies);
+      return {
+        contents: contents,
+        dependencies: dependencies
+      };
     },
     replaceOptions: function(options, contents) {
       return contents.replace(/\{\{className\}\}/g, options.className).replace(/\{\{namespace\}\}/g, options.namespace);
     },
-    wrap: function(options, contents, cb) {
-      return fn.extractDependencies(contents, function(err, contents, dependencies) {
+    wrap: function(options, contents) {
+      var dependencies;
+      dependencies = [];
+      return Promise.resolve().then(function() {
+        var res;
+        res = fn.extractDependencies(contents);
+        contents = res.contents;
+        return dependencies = res.dependencies;
+      }).then(function() {
         var after, before, dependency, j, len;
-        if (err) {
-          return cb(err);
-        }
-        before = fn.replaceOptions(options, '(function(definition){ {{className}} = definition(typeof({{namespace}}) !== "undefined"?{{namespace}}:this.{{namespace}}); {{className}}.definition = definition; if (typeof(module) !== "undefined" && module !== null) { module.exports = {{className}}; } else { if (typeof({{namespace}}) !== "undefined" && {{namespace}} !== null) { {{namespace}}.Tile.{{className}} = {{className}}; } else{ if (this.{{namespace}} == null) { this.{{namespace}} = {}; } this.{{namespace}}.Tile.{{className}} = {{className}}; } } })(function(dependencies) {if(dependencies==null){dependencies={};}').replace(/\s/g, '');
-        for (j = 0, len = dependencies.length; j < len; j++) {
-          dependency = dependencies[j];
-          before += '\nvar {{name}} = dependencies.hasOwnProperty("{{name}}") ? dependencies.{{name}} : {{def}}'.replace(/\{\{name\}\}/g, dependency.name).replace(/\{\{def\}\}/g, dependency.def);
+        before = '(function(definition){ {{className}} = definition(typeof({{namespace}}) !== "undefined"?{{namespace}}:this.{{namespace}}); {{className}}.definition = definition; if (typeof(module) !== "undefined" && module !== null) { module.exports = {{className}}; } else { if (typeof({{namespace}}) !== "undefined" && {{namespace}} !== null) { {{namespace}}.Tile.{{className}} = {{className}}; } else{ if (this.{{namespace}} == null) { this.{{namespace}} = {}; } this.{{namespace}}.Tile.{{className}} = {{className}}; } } })(';
+        before = fn.replaceOptions(options, before).replace(/\s/g, '');
+        if (dependencies.length) {
+          before += 'function(dependencies){if(dependencies==null){dependencies={};}';
+          for (j = 0, len = dependencies.length; j < len; j++) {
+            dependency = dependencies[j];
+            before += '\nvar {{name}} = dependencies.hasOwnProperty("{{name}}") ? dependencies.{{name}} : {{def}}'.replace(/\{\{name\}\}/g, dependency.name).replace(/\{\{def\}\}/g, dependency.def);
+          }
+        } else {
+          before += 'function(){';
         }
         after = fn.replaceOptions(options, 'return({{className}}); });').replace(/\s/g, '');
-        return cb(null, before + '\n' + contents + '\n' + after);
-      });
-    },
-    wrapPart: function(options, contents, cb) {
-      return fn.extractDependencies(contents, function(err, contents, dependencies) {
-        var after, before, dependency, j, len;
-        if (err) {
-          return cb(err);
-        }
-        before = fn.replaceOptions(options, "((definition)->\n  {{namespace}}.{{className}} = definition({{namespace}})\n  {{namespace}}.{{className}}.definition = definition\n)((dependencies={})->");
-        for (j = 0, len = dependencies.length; j < len; j++) {
-          dependency = dependencies[j];
-          before += '\n  {{name}} = dependencies.{{name}}'.replace(/\{\{name\}\}/g, dependency.name).replace(/\{\{def\}\}/g, dependency.def);
-        }
-        after = fn.replaceOptions(options, "  {{className}}\n)");
-        return cb(null, before + '\n' + contents.replace(/^/gm, "  ") + '\n' + after);
+        return before + '\n' + contents + '\n' + after;
       });
     },
     doWrap: function(options, wrap) {
-      return function(file, callback) {
-        var isBuffer, isStream, localOpt;
+      return function(file, enc, callback) {
+        var isBuffer, isStream, localOpt, stream;
+        stream = this;
         localOpt = Object.assign({}, options);
         isStream = file.contents && typeof file.contents.on === 'function' && typeof file.contents.pipe === 'function';
         isBuffer = file.contents instanceof Buffer;
@@ -127,13 +128,10 @@
           if (localOpt.className == null) {
             localOpt.className = path.basename(file.path, path.extname(file.path));
           }
-          return wrap(localOpt, String(file.contents), function(err, contents) {
-            if (err) {
-              return callback(err, file);
-            }
+          return wrap(localOpt, String(file.contents)).then(function(contents) {
             file.contents = new Buffer(contents);
-            return callback(null, file);
-          });
+            return file;
+          }).asCallback(callback);
         } else {
           return callback(null, file);
         }
@@ -141,12 +139,145 @@
     }
   };
 
+  Composer = (function() {
+    function Composer(options) {
+      this.options = Object.assign({}, options);
+      this.files = [];
+      this.processed = [];
+    }
+
+    Composer.prototype.collect = function(file, stream) {
+      this.files.push(file);
+      return Promise.resolve();
+    };
+
+    Composer.prototype.processFile = function(file, stream) {
+      var index;
+      index = this.files.indexOf(file);
+      if (index > -1) {
+        return this.wrapFile(file, stream).then((function(_this) {
+          return function(file) {
+            _this.files.splice(index, 1);
+            stream.push(file);
+            _this.processed.push(file);
+            return file;
+          };
+        })(this));
+      } else {
+        return Promise.reject(new Error('this file is not in the stream'));
+      }
+    };
+
+    Composer.prototype.getProcessedFile = function(path, stream) {
+      return Promise.resolve().then((function(_this) {
+        return function() {
+          var file;
+          if (file = _this.files.find(function(file) {
+            return file.path === path;
+          })) {
+            return _this.processFile(file, stream);
+          } else if (file = _this.processed.find(function(file) {
+            return file.path === path;
+          })) {
+            return file;
+          }
+        };
+      })(this));
+    };
+
+    Composer.prototype.resolveDependency = function(dependency, file, stream) {
+      return Promise.resolve().then((function(_this) {
+        return function() {
+          var dependencyPath, match;
+          if (match = /require(\(|\s*)['"]([^'"]+)['"]\)?/.exec(dependency.def)) {
+            dependencyPath = path.resolve(path.dirname(file.path) + '/' + match[2] + path.extname(file.path));
+            return _this.getProcessedFile(dependencyPath, stream).then(function(dependencyFile) {
+              if (dependencyFile) {
+                return dependency.def = dependency.def.replace(match[0], dependencyFile.wraped.namespace + '.' + dependencyFile.wraped.className);
+              }
+            });
+          }
+        };
+      })(this)).then((function(_this) {
+        return function() {
+          return fn.replaceOptions(_this.options, '\n  {{name}} = if dependencies.hasOwnProperty("{{name}}") then dependencies.{{name}} else {{def}}'.replace(/\{\{def\}\}/g, dependency.def).replace(/\{\{name\}\}/g, dependency.name));
+        };
+      })(this));
+    };
+
+    Composer.prototype.wrapFile = function(file, stream) {
+      return Promise.resolve().then((function(_this) {
+        return function() {
+          var before, contents, dependencies, res;
+          if (file.wraped == null) {
+            file.wraped = {
+              className: path.basename(file.path, path.extname(file.path)),
+              namespace: _this.options.namespace
+            };
+            contents = String(file.contents);
+            res = fn.extractDependencies(contents);
+            contents = res.contents;
+            dependencies = res.dependencies;
+            before = "((definition)->\n  {{namespace}}.{{className}} = definition()\n  {{namespace}}.{{className}}.definition = definition\n)(";
+            if (dependencies.length) {
+              before += '(dependencies={})->';
+            } else {
+              before += '->';
+            }
+            before = fn.replaceOptions(file.wraped, before);
+            return Promise.map(dependencies, function(dependency) {
+              return _this.resolveDependency(dependency, file, stream);
+            }).then(function(dependencies) {
+              var after, dependency, j, len;
+              for (j = 0, len = dependencies.length; j < len; j++) {
+                dependency = dependencies[j];
+                before += dependency;
+              }
+              after = fn.replaceOptions(file.wraped, "  {{className}}\n)");
+              contents = before + '\n' + contents.replace(/^/gm, "  ") + '\n' + after;
+              return file.contents = new Buffer(contents);
+            });
+          }
+        };
+      })(this)).then((function(_this) {
+        return function() {
+          return file;
+        };
+      })(this));
+    };
+
+    Composer.prototype.compose = function(stream) {
+      if (this.files.length) {
+        return this.processFile(this.files[0], stream).then((function(_this) {
+          return function() {
+            return _this.compose(stream);
+          };
+        })(this));
+      }
+    };
+
+    Composer.prototype.getStream = function() {
+      var _this;
+      _this = this;
+      return through.obj(function(file, enc, cb) {
+        return _this.collect(file, this).asCallback(cb);
+      }, function(cb) {
+        return _this.compose(this).asCallback(cb);
+      });
+    };
+
+    return Composer;
+
+  })();
+
   module.exports = function(options) {
-    return es.map(fn.doWrap(options, fn.wrap));
+    return through.obj(fn.doWrap(options, fn.wrap));
   };
 
-  module.exports.wrapPart = function(options) {
-    return es.map(fn.doWrap(options, fn.wrapPart));
+  module.exports.compose = function(options) {
+    var composer;
+    composer = new Composer(options);
+    return composer.getStream();
   };
 
   module.exports.fn = fn;

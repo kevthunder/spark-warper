@@ -26,6 +26,7 @@
     "mocha": "^3.2.0"
   },
   "dependencies": {
-    "event-stream": "^3.3.4"
+    "bluebird": "^3.5.1",
+    "through2": "^2.0.3"
   }
 }
