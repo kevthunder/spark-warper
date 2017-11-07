@@ -75,12 +75,12 @@ fn = {
             module.exports = {{className}};
           } else {
             if (typeof({{namespace}}) !== "undefined" && {{namespace}} !== null) {
-              {{namespace}}.Tile.{{className}} = {{className}};
+              {{namespace}}.{{className}} = {{className}};
             } else{
               if (this.{{namespace}} == null) {
                 this.{{namespace}} = {};
               }
-              this.{{namespace}}.Tile.{{className}} = {{className}};
+              this.{{namespace}}.{{className}} = {{className}};
             }
           }
         })(
