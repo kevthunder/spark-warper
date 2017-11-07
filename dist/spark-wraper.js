@@ -97,7 +97,7 @@
         return dependencies = res.dependencies;
       }).then(function() {
         var after, before, dependency, j, len;
-        before = '(function(definition){ {{className}} = definition(typeof({{namespace}}) !== "undefined"?{{namespace}}:this.{{namespace}}); {{className}}.definition = definition; if (typeof(module) !== "undefined" && module !== null) { module.exports = {{className}}; } else { if (typeof({{namespace}}) !== "undefined" && {{namespace}} !== null) { {{namespace}}.Tile.{{className}} = {{className}}; } else{ if (this.{{namespace}} == null) { this.{{namespace}} = {}; } this.{{namespace}}.Tile.{{className}} = {{className}}; } } })(';
+        before = '(function(definition){ {{className}} = definition(typeof({{namespace}}) !== "undefined"?{{namespace}}:this.{{namespace}}); {{className}}.definition = definition; if (typeof(module) !== "undefined" && module !== null) { module.exports = {{className}}; } else { if (typeof({{namespace}}) !== "undefined" && {{namespace}} !== null) { {{namespace}}.{{className}} = {{className}}; } else{ if (this.{{namespace}} == null) { this.{{namespace}} = {}; } this.{{namespace}}.{{className}} = {{className}}; } } })(';
         before = fn.replaceOptions(options, before).replace(/\s/g, '');
         if (dependencies.length) {
           before += 'function(dependencies){if(dependencies==null){dependencies={};}';
