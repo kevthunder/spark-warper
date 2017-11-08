@@ -10,6 +10,8 @@ coffee = require('gulp-coffee')
 concat = require('gulp-concat')
 
 emptyFolder = (directory,cb)->
+  unless fs.existsSync(directory)
+    return cb()
   fs.readdir directory, (err, files) ->
     if err
       return cb(err)
@@ -180,3 +182,12 @@ describe 'wraper', ->
         obj = new Spark.DependantClass()
         assert.equal obj.hello(), 'hello', 'DependantClass::hello'
         done()
+
+    it 'create namespace loader', (done)->
+      gulp.src(['./test/files/CommentedClass.js','./test/files/BasicClass.js'])
+        .pipe(wraper({namespace:'Spark'}))
+        .pipe(wraper.namespaceLoader({namespace:'Spark'}))
+        .pipe(gulp.dest('./test/output/'))
+        .on 'end', ->
+          done()
+
