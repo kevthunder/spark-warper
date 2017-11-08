@@ -1,7 +1,7 @@
 chai = require('chai')
 chai.use(require('chai-fs'))
 assert = chai.assert
-wraper = require('../lib/spark-wraper')
+wrapper = require('../lib/spark-wrapper')
 parse = require('../lib/parse')
 gulp = require('gulp')
 fs = require('fs')
@@ -29,7 +29,7 @@ emptyFolder = (directory,cb)->
             cb()
     
 
-describe 'wraper', ->
+describe 'wrapper', ->
   describe 'parse functions', ->
     it 'remove var def', ->
       contents = """
@@ -139,7 +139,7 @@ describe 'wraper', ->
     it 'wrap file', (done)->
       assert.notPathExists('./test/output/BasicClass.js')
       gulp.src('./test/files/BasicClass.js')
-        .pipe(wraper({namespace:'Spark'}))
+        .pipe(wrapper({namespace:'Spark'}))
         .pipe(gulp.dest('./test/output/'))
         .on 'end', ->
           assert.pathExists('./test/output/BasicClass.js')
@@ -150,7 +150,7 @@ describe 'wraper', ->
     it 'wrap no dependency file', (done)->
       assert.notPathExists('./test/output/NoDependencyClass.js')
       gulp.src('./test/files/NoDependencyClass.js')
-        .pipe(wraper({namespace:'Spark'}))
+        .pipe(wrapper({namespace:'Spark'}))
         .pipe(gulp.dest('./test/output/'))
         .on 'end', ->
           assert.pathExists('./test/output/NoDependencyClass.js')
@@ -164,7 +164,7 @@ describe 'wraper', ->
     it 'allow dependency override', (done)->
       assert.notPathExists('./test/output/CommentedClass.js')
       gulp.src('./test/files/CommentedClass.js')
-        .pipe(wraper({namespace:'Spark'}))
+        .pipe(wrapper({namespace:'Spark'}))
         .pipe(gulp.dest('./test/output/'))
         .on 'end', ->
           assert.pathExists('./test/output/CommentedClass.js')
@@ -180,7 +180,7 @@ describe 'wraper', ->
     it 'compose and concat files', (done)->
       assert.notPathExists('./test/output/spark.js')
       gulp.src(['./test/files/DependantClass.coffee','./test/files/DependantCommentClass.coffee','./test/files/CompiledClass.coffee'])
-        .pipe(wraper.compose({namespace:'Spark'}))
+        .pipe(wrapper.compose({namespace:'Spark'}))
         .pipe(concat('spark.coffee'))
         .pipe(coffee())
         .pipe(gulp.dest('./test/output/'))
@@ -199,8 +199,8 @@ describe 'wraper', ->
     return
     it 'create namespace loader', (done)->
       gulp.src(['./test/files/CommentedClass.js','./test/files/BasicClass.js'])
-        .pipe(wraper({namespace:'Spark'}))
-        .pipe(wraper.loader({namespace:'Spark'}))
+        .pipe(wrapper({namespace:'Spark'}))
+        .pipe(wrapper.loader({namespace:'Spark'}))
         .pipe(gulp.dest('./test/output/'))
         .on 'end', ->
           Spark = require('./output/Spark.js')
