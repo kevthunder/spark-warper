@@ -30,12 +30,12 @@ fn =
       i = 0
       loop
         line = lines[i]
-        if match = line.match(/^((var|const)\s+)?(\w+)\s*=.*require.*$/)
+        if match = line.match(/^\s*((var|const)\s+)?(\w+)\s*=.*require.*\s*$/)
           if dependencyLines.length == 0
             startAt = lines.slice(0,i).join("\n").length
           dependencyLines.push(line)
           lines.splice(i,1)
-        if line.trim() == ''
+        else if line.trim() == ''
           match = true
           lines.splice(i,1)
         else
