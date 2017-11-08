@@ -17,12 +17,12 @@ module.exports = class Compose extends Stream
     @_base
 
   processFile: (file)->
-    index = @files.indexOf(file)
-    if index > -1
+    if @files.includes(file)
       @wrapFile(file).then (file)=>
-        @files.splice(index, 1)
-        @push(file)
-        @processed.push(file)
+        index = @files.indexOf(file)
+        if index > -1
+          @files.splice(index, 1)
+          @processed.push(file)
         file
     else
       Promise.reject(new Error('this file is not in the stream'))
@@ -39,6 +39,8 @@ module.exports = class Compose extends Stream
       if match = /require(\(|\s*)['"]([^'"]+)['"]\)?/.exec(dependency.def)
         dependencyPath = path.resolve(path.dirname(file.path)+'/'+match[2]+path.extname(file.path))
         @getProcessedFile(dependencyPath).then (dependencyFile)=>
+          if dependency.name == 'Property'
+            console.log(dependencyPath,@files.map((file)->file.path),@processed.map((file)->file.path))
           if dependencyFile
             dependency.def = dependency.def.replace(match[0],dependencyFile.wraped.namespace+'.'+dependencyFile.wraped.className)
     .then =>
@@ -99,6 +101,9 @@ module.exports = class Compose extends Stream
       }));
     .then =>
       @compose()
+    .then =>
+      for file in @processed
+        @push(file)
     .then =>
       contents = """
         if module?
