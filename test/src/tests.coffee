@@ -111,6 +111,20 @@ describe 'wraper', ->
       ]
       assert.equal res.contents.trim(), 'var test = Foo(Bar);'
 
+    it 'extract dependecies coffee', ()->
+      contents = """
+        Foo = require('foo')
+        Bar = require('./bar')
+
+        test = Foo(Bar)
+      """
+      res = parse.extractDependencies(contents)
+      assert.deepEqual res.dependencies, [
+        {name:'Foo',def:"require('foo')"}
+        {name:'Bar',def:"require('./bar')"}
+      ]
+      assert.equal res.contents.trim(), 'test = Foo(Bar)'
+
   describe 'compile', ->
 
     beforeEach (done)->
@@ -165,7 +179,7 @@ describe 'wraper', ->
 
     it 'compose and concat files', (done)->
       assert.notPathExists('./test/output/spark.js')
-      gulp.src(['./test/files/DependantClass.coffee','./test/files/CompiledClass.coffee'])
+      gulp.src(['./test/files/DependantClass.coffee','./test/files/DependantCommentClass.coffee','./test/files/CompiledClass.coffee'])
         .pipe(wraper.compose({namespace:'Spark'}))
         .pipe(concat('spark.coffee'))
         .pipe(coffee())
@@ -179,8 +193,10 @@ describe 'wraper', ->
           assert.equal obj.hello(), 'hello', 'CompiledClass::hello'
           obj = new Spark.DependantClass()
           assert.equal obj.hello(), 'hello', 'DependantClass::hello'
+          assert.equal obj.hello2(), 'hello', 'DependantClass::hello2'
           done()
 
+    return
     it 'create namespace loader', (done)->
       gulp.src(['./test/files/CommentedClass.js','./test/files/BasicClass.js'])
         .pipe(wraper({namespace:'Spark'}))

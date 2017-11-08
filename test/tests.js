@@ -110,7 +110,7 @@
         ]);
         return assert.equal(res.contents.trim(), 'var test = Foo(Bar);');
       });
-      return it('extract dependecies with var before', function() {
+      it('extract dependecies with var before', function() {
         var contents, res;
         contents = "var Foo, Bar;\nFoo = require('foo');\n\nBar = require('bar');\n\nvar test = Foo(Bar);";
         res = parse.extractDependencies(contents);
@@ -124,6 +124,21 @@
           }
         ]);
         return assert.equal(res.contents.trim(), 'var test = Foo(Bar);');
+      });
+      return it('extract dependecies coffee', function() {
+        var contents, res;
+        contents = "Foo = require('foo')\nBar = require('./bar')\n\ntest = Foo(Bar)";
+        res = parse.extractDependencies(contents);
+        assert.deepEqual(res.dependencies, [
+          {
+            name: 'Foo',
+            def: "require('foo')"
+          }, {
+            name: 'Bar',
+            def: "require('./bar')"
+          }
+        ]);
+        return assert.equal(res.contents.trim(), 'test = Foo(Bar)');
       });
     });
     return describe('compile', function() {
@@ -187,7 +202,7 @@
       });
       it('compose and concat files', function(done) {
         assert.notPathExists('./test/output/spark.js');
-        return gulp.src(['./test/files/DependantClass.coffee', './test/files/CompiledClass.coffee']).pipe(wraper.compose({
+        return gulp.src(['./test/files/DependantClass.coffee', './test/files/DependantCommentClass.coffee', './test/files/CompiledClass.coffee']).pipe(wraper.compose({
           namespace: 'Spark'
         })).pipe(concat('spark.coffee')).pipe(coffee()).pipe(gulp.dest('./test/output/')).on('end', function() {
           var Spark, obj;
@@ -199,9 +214,11 @@
           assert.equal(obj.hello(), 'hello', 'CompiledClass::hello');
           obj = new Spark.DependantClass();
           assert.equal(obj.hello(), 'hello', 'DependantClass::hello');
+          assert.equal(obj.hello2(), 'hello', 'DependantClass::hello2');
           return done();
         });
       });
+      return;
       return it('create namespace loader', function(done) {
         return gulp.src(['./test/files/CommentedClass.js', './test/files/BasicClass.js']).pipe(wraper({
           namespace: 'Spark'

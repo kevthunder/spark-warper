@@ -1,7 +1,8 @@
-### dependencies ###
 CompiledClass = require('./CompiledClass')
-### end dependencies ###
+DependantCommentClass = require('./DependantCommentClass')
 
 class DependantClass
   hello: ->
     (new CompiledClass()).hello()
+  hello2: ->
+    (new DependantCommentClass()).hello()
