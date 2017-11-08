@@ -1,11 +1,11 @@
 {
-  "name": "spark-wraper",
+  "name": "spark-wrapper",
   "version": "0.1.0",
   "description": "Wrap your class for exporting with gulp",
-  "main": "lib/spark-wraper.js",
+  "main": "lib/spark-wrapper.js",
   "repository": {
     "type": "git",
-    "url": "git://github.com/kevthunder/spark-wraper.git"
+    "url": "git://github.com/kevthunder/spark-wrapper.git"
   },
   "scripts": {
     "test": "gulp test",

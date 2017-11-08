@@ -1,5 +1,5 @@
 (function() {
-  var assert, chai, coffee, concat, emptyFolder, fs, gulp, merge, parse, path, wraper;
+  var assert, chai, coffee, concat, emptyFolder, fs, gulp, merge, parse, path, wrapper;
 
   chai = require('chai');
 
@@ -7,7 +7,7 @@
 
   assert = chai.assert;
 
-  wraper = require('../lib/spark-wraper');
+  wrapper = require('../lib/spark-wrapper');
 
   parse = require('../lib/parse');
 
@@ -54,7 +54,7 @@
     });
   };
 
-  describe('wraper', function() {
+  describe('wrapper', function() {
     describe('parse functions', function() {
       it('remove var def', function() {
         var contents;
@@ -156,7 +156,7 @@
       });
       it('wrap file', function(done) {
         assert.notPathExists('./test/output/BasicClass.js');
-        return gulp.src('./test/files/BasicClass.js').pipe(wraper({
+        return gulp.src('./test/files/BasicClass.js').pipe(wrapper({
           namespace: 'Spark'
         })).pipe(gulp.dest('./test/output/')).on('end', function() {
           var BasicClass;
@@ -168,7 +168,7 @@
       });
       it('wrap no dependency file', function(done) {
         assert.notPathExists('./test/output/NoDependencyClass.js');
-        return gulp.src('./test/files/NoDependencyClass.js').pipe(wraper({
+        return gulp.src('./test/files/NoDependencyClass.js').pipe(wrapper({
           namespace: 'Spark'
         })).pipe(gulp.dest('./test/output/')).on('end', function() {
           var NoDependencyClass, obj;
@@ -183,7 +183,7 @@
       });
       it('allow dependency override', function(done) {
         assert.notPathExists('./test/output/CommentedClass.js');
-        return gulp.src('./test/files/CommentedClass.js').pipe(wraper({
+        return gulp.src('./test/files/CommentedClass.js').pipe(wrapper({
           namespace: 'Spark'
         })).pipe(gulp.dest('./test/output/')).on('end', function() {
           var CommentedClass, obj;
@@ -202,7 +202,7 @@
       });
       it('compose and concat files', function(done) {
         assert.notPathExists('./test/output/spark.js');
-        return gulp.src(['./test/files/DependantClass.coffee', './test/files/DependantCommentClass.coffee', './test/files/CompiledClass.coffee']).pipe(wraper.compose({
+        return gulp.src(['./test/files/DependantClass.coffee', './test/files/DependantCommentClass.coffee', './test/files/CompiledClass.coffee']).pipe(wrapper.compose({
           namespace: 'Spark'
         })).pipe(concat('spark.coffee')).pipe(coffee()).pipe(gulp.dest('./test/output/')).on('end', function() {
           var Spark, obj;
@@ -220,9 +220,9 @@
       });
       return;
       return it('create namespace loader', function(done) {
-        return gulp.src(['./test/files/CommentedClass.js', './test/files/BasicClass.js']).pipe(wraper({
+        return gulp.src(['./test/files/CommentedClass.js', './test/files/BasicClass.js']).pipe(wrapper({
           namespace: 'Spark'
-        })).pipe(wraper.loader({
+        })).pipe(wrapper.loader({
           namespace: 'Spark'
         })).pipe(gulp.dest('./test/output/')).on('end', function() {
           var Spark, obj;

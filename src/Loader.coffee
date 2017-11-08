@@ -8,7 +8,7 @@ parse = require('./parse');
 module.exports = class Loader extends Stream
   constructor: (options)->
     if !options.namespace?
-      throw new Error('spark-wraper: namespace needed')
+      throw new Error('spark-wrapper: namespace needed')
     @opt = Object.assign({},options)
     super()
 

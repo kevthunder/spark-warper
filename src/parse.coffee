@@ -45,7 +45,7 @@ fn =
     dependencies = dependencyLines.map (line)->
       match = line.match(/^((var|const)\s+)?(\w+)\s*=\s*/)
       unless match?
-        throw new Error('spark-wraper: malformated dependency :'+line)
+        throw new Error('spark-wrapper: malformated dependency :'+line)
       {
           name: match[3]
           def: line.substring(match[0].length)

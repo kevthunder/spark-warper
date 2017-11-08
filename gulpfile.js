@@ -11,9 +11,9 @@ gulp.task('coffee', function() {
 });
 
 gulp.task('compress', ['coffee'], function () {
-  return gulp.src('./dist/spark-wraper.js')
+  return gulp.src('./dist/spark-wrapper.js')
     .pipe(uglify())
-    .pipe(rename('spark-wraper.min.js'))
+    .pipe(rename('spark-wrapper.min.js'))
     .pipe(gulp.dest('./dist/'));
 });
 
