@@ -1,7 +1,8 @@
 chai = require('chai')
 chai.use(require('chai-fs'))
 assert = chai.assert
-wraper = require('../dist/spark-wraper')
+wraper = require('../lib/spark-wraper')
+parse = require('../lib/parse')
 gulp = require('gulp')
 fs = require('fs')
 path = require('path')
@@ -29,20 +30,20 @@ emptyFolder = (directory,cb)->
     
 
 describe 'wraper', ->
-  describe 'functions', ->
+  describe 'parse functions', ->
     it 'remove var def', ->
       contents = """
         var Foo, Bar;
         // comment
       """
-      contents = wraper.fn.removeVarDef(contents,['Foo','Bar'],contents.length)
+      contents = parse.removeVarDef(contents,['Foo','Bar'],contents.length)
       assert.equal contents.trim(), '// comment'
     it 'remove some var def', ->
       contents = """
         var Foo, Baz, Bar;
         // comment
       """
-      contents = wraper.fn.removeVarDef(contents,['Foo','Bar'],contents.length)
+      contents = parse.removeVarDef(contents,['Foo','Bar'],contents.length)
       assert.equal contents.trim(), 'var Baz;\n// comment'
 
     it 'remove var def with init', ->
@@ -50,7 +51,7 @@ describe 'wraper', ->
         var Foo, Bar, FooBar = 'lol';
         // comment
       """
-      contents = wraper.fn.removeVarDef(contents,['Foo','Bar'],contents.length)
+      contents = parse.removeVarDef(contents,['Foo','Bar'],contents.length)
       assert.equal contents.trim(), "var FooBar = 'lol';\n// comment"
 
     it 'remove some var def with init', ->
@@ -58,7 +59,7 @@ describe 'wraper', ->
         var Foo, Baz, Bar, FooBar = 'lol';
         // comment
       """
-      contents = wraper.fn.removeVarDef(contents,['Foo','Bar'],contents.length)
+      contents = parse.removeVarDef(contents,['Foo','Bar'],contents.length)
       assert.equal contents.trim(), "var Baz, FooBar = 'lol';\n// comment"
 
     it 'extract dependecies with comments', ()->
@@ -71,7 +72,7 @@ describe 'wraper', ->
 
         var test = hello;
       """
-      res = wraper.fn.extractDependencies(contents)
+      res = parse.extractDependencies(contents)
       assert.deepEqual res.dependencies, [
         {name:'Path',def:"require('path');"}
         {name:'hello',def:"'hello';"}
@@ -87,7 +88,7 @@ describe 'wraper', ->
 
         var test = Foo(Bar);
       """
-      res = wraper.fn.extractDependencies(contents)
+      res = parse.extractDependencies(contents)
       assert.deepEqual res.dependencies, [
         {name:'Foo',def:"require('foo');"}
         {name:'Bar',def:"require('bar');"}
@@ -103,12 +104,13 @@ describe 'wraper', ->
 
         var test = Foo(Bar);
       """
-      res = wraper.fn.extractDependencies(contents)
+      res = parse.extractDependencies(contents)
       assert.deepEqual res.dependencies, [
         {name:'Foo',def:"require('foo');"}
         {name:'Bar',def:"require('bar');"}
       ]
       assert.equal res.contents.trim(), 'var test = Foo(Bar);'
+
   describe 'compile', ->
 
     beforeEach (done)->
@@ -130,7 +132,7 @@ describe 'wraper', ->
           BasicClass = require('./output/BasicClass.js')
           assert.isFunction(BasicClass.definition)
           done()
-
+          
     it 'wrap no dependency file', (done)->
       assert.notPathExists('./test/output/NoDependencyClass.js')
       gulp.src('./test/files/NoDependencyClass.js')
@@ -163,31 +165,32 @@ describe 'wraper', ->
 
     it 'compose and concat files', (done)->
       assert.notPathExists('./test/output/spark.js')
-      merge(
-         gulp.src('./test/files/_start.coffee'),
-         gulp.src(['./test/files/DependantClass.coffee','./test/files/CompiledClass.coffee'])
-          .pipe(wraper.compose({namespace:'Spark'})),
-         gulp.src('./test/files/_end.coffee'),
-      )
-      .pipe(concat('spark.coffee'))
-      .pipe(coffee())
-      .pipe(gulp.dest('./test/output/'))
-      .on 'end', ->
-        assert.pathExists('./test/output/spark.js')
-        Spark = require('./output/spark.js')
-        assert.isFunction(Spark.CompiledClass)
-        assert.isFunction(Spark.CompiledClass.definition)
-        obj = new Spark.CompiledClass()
-        assert.equal obj.hello(), 'hello', 'CompiledClass::hello'
-        obj = new Spark.DependantClass()
-        assert.equal obj.hello(), 'hello', 'DependantClass::hello'
-        done()
+      gulp.src(['./test/files/DependantClass.coffee','./test/files/CompiledClass.coffee'])
+        .pipe(wraper.compose({namespace:'Spark'}))
+        .pipe(concat('spark.coffee'))
+        .pipe(coffee())
+        .pipe(gulp.dest('./test/output/'))
+        .on 'end', ->
+          assert.pathExists('./test/output/spark.js')
+          Spark = require('./output/spark.js')
+          assert.isFunction(Spark.CompiledClass)
+          assert.isFunction(Spark.CompiledClass.definition)
+          obj = new Spark.CompiledClass()
+          assert.equal obj.hello(), 'hello', 'CompiledClass::hello'
+          obj = new Spark.DependantClass()
+          assert.equal obj.hello(), 'hello', 'DependantClass::hello'
+          done()
 
     it 'create namespace loader', (done)->
       gulp.src(['./test/files/CommentedClass.js','./test/files/BasicClass.js'])
         .pipe(wraper({namespace:'Spark'}))
-        .pipe(wraper.namespaceLoader({namespace:'Spark'}))
+        .pipe(wraper.loader({namespace:'Spark'}))
         .pipe(gulp.dest('./test/output/'))
         .on 'end', ->
+          Spark = require('./output/Spark.js')
+          assert.isFunction(Spark.CommentedClass)
+          assert.isFunction(Spark.BasicClass)
+          obj = new Spark.CommentedClass()
+          assert.equal obj.test(), 'hello'
           done()
 
