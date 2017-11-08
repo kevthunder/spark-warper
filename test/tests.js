@@ -22,6 +22,9 @@
   concat = require('gulp-concat');
 
   emptyFolder = function(directory, cb) {
+    if (!fs.existsSync(directory)) {
+      return cb();
+    }
     return fs.readdir(directory, function(err, files) {
       var done, file, i, len, results;
       if (err) {
@@ -180,7 +183,7 @@
           return done();
         });
       });
-      return it('compose and concat files', function(done) {
+      it('compose and concat files', function(done) {
         assert.notPathExists('./test/output/spark.js');
         return merge(gulp.src('./test/files/_start.coffee'), gulp.src(['./test/files/DependantClass.coffee', './test/files/CompiledClass.coffee']).pipe(wraper.compose({
           namespace: 'Spark'
@@ -194,6 +197,15 @@
           assert.equal(obj.hello(), 'hello', 'CompiledClass::hello');
           obj = new Spark.DependantClass();
           assert.equal(obj.hello(), 'hello', 'DependantClass::hello');
+          return done();
+        });
+      });
+      return it('create namespace loader', function(done) {
+        return gulp.src(['./test/files/CommentedClass.js', './test/files/BasicClass.js']).pipe(wraper({
+          namespace: 'Spark'
+        })).pipe(wraper.namespaceLoader({
+          namespace: 'Spark'
+        })).pipe(gulp.dest('./test/output/')).on('end', function() {
           return done();
         });
       });

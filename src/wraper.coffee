@@ -1,7 +1,8 @@
 through = require('through2')
 path = require('path');
 Promise = require('bluebird');
-
+gutil = require('gulp-util');
+upath = require('upath');
 
 fn = {
   removeVarDef: (contents, vars, limit) ->
@@ -113,12 +114,44 @@ fn = {
       else if isBuffer
         unless localOpt.className?
           localOpt.className = path.basename(file.path,path.extname(file.path))
+        file.wraped = localOpt
         wrap(localOpt, String(file.contents)).then (contents)->
           file.contents = new Buffer(contents)
+          console.log(file.wraped)
           file
         .asCallback(callback)
       else
         callback null, file
+
+  collect: (files)->
+    (file, enc, cb) ->
+      files.push(file)
+      Promise.resolve().asCallback(cb)
+
+  list: (files)->
+    (file, enc, cb) ->
+      files.push(file)
+      cb(null, file)
+
+  namespaceLoader: (options,files)->
+    (cb) ->
+      namespaceFile = 'test.js'
+      contents = 'if(module){\n'
+      contents += 'module.exports = {\n'
+      contents += files.filter (file)->
+        file.wraped
+      .map (file)->
+        console.log(file.wraped)
+        file.wraped.className+": require('"+upath.relative(path.dirname(namespaceFile),file.path)+"')"
+      .join(",\n")
+      contents += '\n};\n}'
+      console.log(contents)
+      cb(null, new gutil.File({
+        cwd: "",
+        base: "",
+        path: namespaceFile,
+        contents: new Buffer(contents)
+      }));
 }
 
 class Composer
@@ -126,9 +159,6 @@ class Composer
     @options = Object.assign({},options)
     @files = []
     @processed = []
-  collect: (file, stream)->
-    @files.push(file)
-    Promise.resolve()
   processFile: (file, stream)->
     index = @files.indexOf(file)
     if index > -1
@@ -199,9 +229,7 @@ class Composer
         @compose(stream)
   getStream: ->
     _this = this
-    through.obj (file, enc, cb) ->
-      _this.collect(file,this).asCallback(cb)
-    , (cb)->
+    through.obj fn.collect(@files), (cb)->
       _this.compose(this).asCallback(cb)
 
 module.exports = (options) ->
@@ -209,4 +237,8 @@ module.exports = (options) ->
 module.exports.compose = (options) ->
   composer = new Composer(options)
   composer.getStream()
+module.exports.namespaceLoader = (options) ->
+  files = []
+  through.obj fn.list(files), fn.namespaceLoader(options, files)
+
 module.exports.fn = fn

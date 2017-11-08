@@ -1,11 +1,15 @@
 (function() {
-  var Composer, Promise, fn, path, through;
+  var Composer, Promise, fn, gutil, path, through, upath;
 
   through = require('through2');
 
   path = require('path');
 
   Promise = require('bluebird');
+
+  gutil = require('gulp-util');
+
+  upath = require('upath');
 
   fn = {
     removeVarDef: function(contents, vars, limit) {
@@ -128,13 +132,49 @@
           if (localOpt.className == null) {
             localOpt.className = path.basename(file.path, path.extname(file.path));
           }
+          file.wraped = localOpt;
           return wrap(localOpt, String(file.contents)).then(function(contents) {
             file.contents = new Buffer(contents);
+            console.log(file.wraped);
             return file;
           }).asCallback(callback);
         } else {
           return callback(null, file);
         }
+      };
+    },
+    collect: function(files) {
+      return function(file, enc, cb) {
+        files.push(file);
+        return Promise.resolve().asCallback(cb);
+      };
+    },
+    list: function(files) {
+      return function(file, enc, cb) {
+        files.push(file);
+        return cb(null, file);
+      };
+    },
+    namespaceLoader: function(options, files) {
+      return function(cb) {
+        var contents, namespaceFile;
+        namespaceFile = 'test.js';
+        contents = 'if(module){\n';
+        contents += 'module.exports = {\n';
+        contents += files.filter(function(file) {
+          return file.wraped;
+        }).map(function(file) {
+          console.log(file.wraped);
+          return file.wraped.className + ": require('" + upath.relative(path.dirname(namespaceFile), file.path) + "')";
+        }).join(",\n");
+        contents += '\n};\n}';
+        console.log(contents);
+        return cb(null, new gutil.File({
+          cwd: "",
+          base: "",
+          path: namespaceFile,
+          contents: new Buffer(contents)
+        }));
       };
     }
   };
@@ -145,11 +185,6 @@
       this.files = [];
       this.processed = [];
     }
-
-    Composer.prototype.collect = function(file, stream) {
-      this.files.push(file);
-      return Promise.resolve();
-    };
 
     Composer.prototype.processFile = function(file, stream) {
       var index;
@@ -259,9 +294,7 @@
     Composer.prototype.getStream = function() {
       var _this;
       _this = this;
-      return through.obj(function(file, enc, cb) {
-        return _this.collect(file, this).asCallback(cb);
-      }, function(cb) {
+      return through.obj(fn.collect(this.files), function(cb) {
         return _this.compose(this).asCallback(cb);
       });
     };
@@ -278,6 +311,12 @@
     var composer;
     composer = new Composer(options);
     return composer.getStream();
+  };
+
+  module.exports.namespaceLoader = function(options) {
+    var files;
+    files = [];
+    return through.obj(fn.list(files), fn.namespaceLoader(options, files));
   };
 
   module.exports.fn = fn;
