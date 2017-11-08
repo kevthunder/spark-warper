@@ -1,5 +1,5 @@
 (function() {
-  var assert, chai, coffee, concat, emptyFolder, fs, gulp, merge, path, wraper;
+  var assert, chai, coffee, concat, emptyFolder, fs, gulp, merge, parse, path, wraper;
 
   chai = require('chai');
 
@@ -7,7 +7,9 @@
 
   assert = chai.assert;
 
-  wraper = require('../dist/spark-wraper');
+  wraper = require('../lib/spark-wraper');
+
+  parse = require('../lib/parse');
 
   gulp = require('gulp');
 
@@ -53,35 +55,35 @@
   };
 
   describe('wraper', function() {
-    describe('functions', function() {
+    describe('parse functions', function() {
       it('remove var def', function() {
         var contents;
         contents = "var Foo, Bar;\n// comment";
-        contents = wraper.fn.removeVarDef(contents, ['Foo', 'Bar'], contents.length);
+        contents = parse.removeVarDef(contents, ['Foo', 'Bar'], contents.length);
         return assert.equal(contents.trim(), '// comment');
       });
       it('remove some var def', function() {
         var contents;
         contents = "var Foo, Baz, Bar;\n// comment";
-        contents = wraper.fn.removeVarDef(contents, ['Foo', 'Bar'], contents.length);
+        contents = parse.removeVarDef(contents, ['Foo', 'Bar'], contents.length);
         return assert.equal(contents.trim(), 'var Baz;\n// comment');
       });
       it('remove var def with init', function() {
         var contents;
         contents = "var Foo, Bar, FooBar = 'lol';\n// comment";
-        contents = wraper.fn.removeVarDef(contents, ['Foo', 'Bar'], contents.length);
+        contents = parse.removeVarDef(contents, ['Foo', 'Bar'], contents.length);
         return assert.equal(contents.trim(), "var FooBar = 'lol';\n// comment");
       });
       it('remove some var def with init', function() {
         var contents;
         contents = "var Foo, Baz, Bar, FooBar = 'lol';\n// comment";
-        contents = wraper.fn.removeVarDef(contents, ['Foo', 'Bar'], contents.length);
+        contents = parse.removeVarDef(contents, ['Foo', 'Bar'], contents.length);
         return assert.equal(contents.trim(), "var Baz, FooBar = 'lol';\n// comment");
       });
       it('extract dependecies with comments', function() {
         var contents, res;
         contents = "/* dependencies */\nvar Path = require('path');\n\nvar hello = 'hello';\n/* end dependencies */\n\nvar test = hello;";
-        res = wraper.fn.extractDependencies(contents);
+        res = parse.extractDependencies(contents);
         assert.deepEqual(res.dependencies, [
           {
             name: 'Path',
@@ -96,7 +98,7 @@
       it('extract dependecies without comments', function() {
         var contents, res;
         contents = "\nvar Foo = require('foo');\n\nvar Bar = require('bar');\n\nvar test = Foo(Bar);";
-        res = wraper.fn.extractDependencies(contents);
+        res = parse.extractDependencies(contents);
         assert.deepEqual(res.dependencies, [
           {
             name: 'Foo',
@@ -111,7 +113,7 @@
       return it('extract dependecies with var before', function() {
         var contents, res;
         contents = "var Foo, Bar;\nFoo = require('foo');\n\nBar = require('bar');\n\nvar test = Foo(Bar);";
-        res = wraper.fn.extractDependencies(contents);
+        res = parse.extractDependencies(contents);
         assert.deepEqual(res.dependencies, [
           {
             name: 'Foo',
@@ -185,9 +187,9 @@
       });
       it('compose and concat files', function(done) {
         assert.notPathExists('./test/output/spark.js');
-        return merge(gulp.src('./test/files/_start.coffee'), gulp.src(['./test/files/DependantClass.coffee', './test/files/CompiledClass.coffee']).pipe(wraper.compose({
+        return gulp.src(['./test/files/DependantClass.coffee', './test/files/CompiledClass.coffee']).pipe(wraper.compose({
           namespace: 'Spark'
-        })), gulp.src('./test/files/_end.coffee')).pipe(concat('spark.coffee')).pipe(coffee()).pipe(gulp.dest('./test/output/')).on('end', function() {
+        })).pipe(concat('spark.coffee')).pipe(coffee()).pipe(gulp.dest('./test/output/')).on('end', function() {
           var Spark, obj;
           assert.pathExists('./test/output/spark.js');
           Spark = require('./output/spark.js');
@@ -203,9 +205,15 @@
       return it('create namespace loader', function(done) {
         return gulp.src(['./test/files/CommentedClass.js', './test/files/BasicClass.js']).pipe(wraper({
           namespace: 'Spark'
-        })).pipe(wraper.namespaceLoader({
+        })).pipe(wraper.loader({
           namespace: 'Spark'
         })).pipe(gulp.dest('./test/output/')).on('end', function() {
+          var Spark, obj;
+          Spark = require('./output/Spark.js');
+          assert.isFunction(Spark.CommentedClass);
+          assert.isFunction(Spark.BasicClass);
+          obj = new Spark.CommentedClass();
+          assert.equal(obj.test(), 'hello');
           return done();
         });
       });

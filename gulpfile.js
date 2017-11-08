@@ -5,10 +5,9 @@ var uglify = require('gulp-uglify');
 var mocha = require('gulp-mocha');
 
 gulp.task('coffee', function() {
-  return gulp.src(['./src/wraper.coffee'])
+  return gulp.src(['./src/*.coffee'])
     .pipe(coffee())
-    .pipe(rename('spark-wraper.js'))
-    .pipe(gulp.dest('./dist/'));
+    .pipe(gulp.dest('./lib/'));
 });
 
 gulp.task('compress', ['coffee'], function () {
