@@ -6,7 +6,7 @@ parse = require('./parse');
 
 module.exports = class Compose extends Stream
   constructor: (options)->
-    @opt = Object.assign({},options)
+    @opt = Object.assign({exclude:/^_/},options)
     @files = []
     @processed = []
     super()
@@ -37,7 +37,7 @@ module.exports = class Compose extends Stream
         file
   getProcessedByRef: (module, ref)->
     find = (file)->
-      file.wraped?.module == module && ref.indexOf(file.wraped.className) == 0
+      file.wrapped?.module == module && ref.indexOf(file.wrapped.className) == 0
     Promise.resolve().then =>
       if file = @files.find(find)
         @processFile(file)
@@ -45,25 +45,32 @@ module.exports = class Compose extends Stream
         file
 
   resolveDependency: (dependency, file)->
+    match = null
     Promise.resolve().then =>
       if match = /require\(['"]([-_\d\w]+)['"]\)((.[_\d\w])+)/.exec(dependency.def)
         module = match[1]
         ref = match[2].substring(1)
-        @getProcessedByRef(module, ref).then (dependencyFile)=>
-          if dependencyFile
-            dependency.def = dependency.def.replace(match[0],dependencyFile.wraped.namespace+'.'+dependencyFile.wraped.className)
+        @getProcessedByRef(module, ref)
       else if match = /require(\(|\s*)['"]([^'"]+)['"]\)?/.exec(dependency.def)
         dependencyPath = path.resolve(path.dirname(file.path)+'/'+match[2]+path.extname(file.path))
-        @getProcessedFile(dependencyPath).then (dependencyFile)=>
-          if dependencyFile
-            dependency.def = dependency.def.replace(match[0],dependencyFile.wraped.namespace+'.'+dependencyFile.wraped.className)
+        @getProcessedFile(dependencyPath)
+    .then (dependencyFile)=>
+      if dependencyFile
+        dependency.def = dependency.def.replace(match[0],dependencyFile.wrapped.namespace+'.'+dependencyFile.wrapped.className)
+        unless file.wrapped.dependencies
+          file.wrapped.dependencies = []
+        file.wrapped.dependencies.push(dependencyFile.path)
     .then =>
       parse.replaceOptions(@opt,'\n  {{name}} = if dependencies.hasOwnProperty("{{name}}") then dependencies.{{name}} else {{def}}'
         .replace(/\{\{def\}\}/g,dependency.def).replace(/\{\{name\}\}/g,dependency.name))
 
   wrapFile: (file)->
     Promise.resolve().then =>
-      unless file.wraped?
+      if file.wrapped?
+        if file.wrapped.dependencies
+          Promise.all file.wrapped.dependencies.map (dependency)=>
+            @getProcessedFile(dependency)
+      else if !path.basename(file.path).match(@opt.exclude)
         @addFileOptions(file)
         contents = String(file.contents)
         res = parse.extractDependencies(contents)
@@ -78,14 +85,14 @@ module.exports = class Compose extends Stream
           before += '(dependencies={})->'
         else
           before += '->'
-        before = parse.replaceOptions(file.wraped,before)
+        before = parse.replaceOptions(file.wrapped,before)
 
         Promise.map(dependencies, (dependency)=>@resolveDependency(dependency,file)).then (dependencies)=>
           for dependency in dependencies
             before += dependency
 
 
-          after = parse.replaceOptions(file.wraped,"""
+          after = parse.replaceOptions(file.wrapped,"""
               {{className}}
             )
           """)
@@ -98,7 +105,7 @@ module.exports = class Compose extends Stream
     options = Object.assign({},@opt,{
       className: path.basename(file.path,path.extname(file.path))
     })
-    file.wraped = options;
+    file.wrapped = options;
   compose: ->
     if @files.length
       @processFile(@files[0]).then =>
@@ -114,7 +121,7 @@ module.exports = class Compose extends Stream
         path: path.join(@getBase(),'_start.coffee'),
         contents: new Buffer(@opt.namespace + '={}')
       })
-      file.wraped = Object.assign({
+      file.wrapped = Object.assign({
         special: 'start'
       },@opt)
       @push(file);
@@ -122,10 +129,10 @@ module.exports = class Compose extends Stream
       @compose()
     .then =>
       for file in @processed
-        if file.wraped?.special == 'start' && file.wraped.namespace != @opt.namespace
+        if file.wrapped?.special == 'start' && file.wrapped.namespace != @opt.namespace
           @push(file)
       for file in @processed
-        unless file.wraped?.special == 'end' || file.wraped?.special == 'start'
+        unless file.wrapped?.special == 'end' || file.wrapped?.special == 'start'
           @push(file)
     .then =>
       contents = """
@@ -141,7 +148,7 @@ module.exports = class Compose extends Stream
         path: path.join(@getBase(),'_end.coffee'),
         contents: new Buffer(contents)
       })
-      file.wraped = {
+      file.wrapped = {
         special: 'end'
       }
       @push(file);
