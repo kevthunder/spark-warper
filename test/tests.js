@@ -218,8 +218,7 @@
           return done();
         });
       });
-      return;
-      return it('create namespace loader', function(done) {
+      it('create namespace loader', function(done) {
         return gulp.src(['./test/files/CommentedClass.js', './test/files/BasicClass.js']).pipe(wrapper({
           namespace: 'Spark'
         })).pipe(wrapper.loader({
@@ -231,6 +230,49 @@
           assert.isFunction(Spark.BasicClass);
           obj = new Spark.CommentedClass();
           assert.equal(obj.test(), 'hello');
+          return done();
+        });
+      });
+      it('compose external module', function(done) {
+        return merge([
+          wrapper.composeModule({
+            namespace: 'Spark.MyModule',
+            module: 'my-module'
+          }, '*.coffee'), gulp.src(['./test/files/ExternalDependantClass.coffee'])
+        ]).pipe(wrapper.compose({
+          namespace: 'Spark'
+        })).pipe(concat('spark.coffee')).pipe(coffee()).pipe(gulp.dest('./test/output/')).on('end', function() {
+          var Spark, obj;
+          assert.pathExists('./test/output/spark.js');
+          Spark = require('./output/spark.js');
+          assert.isDefined(Spark.MyModule);
+          assert.isFunction(Spark.MyModule.CompiledClass);
+          assert.isFunction(Spark.MyModule.CompiledClass.definition);
+          obj = new Spark.MyModule.CompiledClass();
+          assert.equal(obj.hello(), 'hello', 'CompiledClass::hello');
+          obj = new Spark.ExternalDependantClass();
+          assert.equal(obj.hello(), 'hello', 'ExternalDependantClass::hello');
+          return done();
+        });
+      });
+      return it('compose external module same namespace', function(done) {
+        return merge([
+          wrapper.composeModule({
+            namespace: 'Spark',
+            module: 'my-module'
+          }, '*.coffee'), gulp.src(['./test/files/ExternalDependantClass.coffee'])
+        ]).pipe(wrapper.compose({
+          namespace: 'Spark'
+        })).pipe(concat('spark.coffee')).pipe(coffee()).pipe(gulp.dest('./test/output/')).on('end', function() {
+          var Spark, obj;
+          assert.pathExists('./test/output/spark.js');
+          Spark = require('./output/spark.js');
+          assert.isFunction(Spark.CompiledClass);
+          assert.isFunction(Spark.CompiledClass.definition);
+          obj = new Spark.CompiledClass();
+          assert.equal(obj.hello(), 'hello', 'CompiledClass::hello');
+          obj = new Spark.ExternalDependantClass();
+          assert.equal(obj.hello(), 'hello', 'ExternalDependantClass::hello');
           return done();
         });
       });

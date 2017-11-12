@@ -28,19 +28,33 @@ module.exports = class Compose extends Stream
       Promise.reject(new Error('this file is not in the stream'))
 
   getProcessedFile: (path)->
+    find = (file)->
+      file.path == path
     Promise.resolve().then =>
-      if file = @files.find((file)->file.path == path)
+      if file = @files.find(find)
         @processFile(file)
-      else if file = @processed.find((file)->file.path == path)
+      else if file = @processed.find(find)
+        file
+  getProcessedByRef: (module, ref)->
+    find = (file)->
+      file.wraped?.module == module && ref.indexOf(file.wraped.className) == 0
+    Promise.resolve().then =>
+      if file = @files.find(find)
+        @processFile(file)
+      else if file = @processed.find(find)
         file
 
   resolveDependency: (dependency, file)->
     Promise.resolve().then =>
-      if match = /require(\(|\s*)['"]([^'"]+)['"]\)?/.exec(dependency.def)
+      if match = /require\(['"]([-_\d\w]+)['"]\)((.[_\d\w])+)/.exec(dependency.def)
+        module = match[1]
+        ref = match[2].substring(1)
+        @getProcessedByRef(module, ref).then (dependencyFile)=>
+          if dependencyFile
+            dependency.def = dependency.def.replace(match[0],dependencyFile.wraped.namespace+'.'+dependencyFile.wraped.className)
+      else if match = /require(\(|\s*)['"]([^'"]+)['"]\)?/.exec(dependency.def)
         dependencyPath = path.resolve(path.dirname(file.path)+'/'+match[2]+path.extname(file.path))
         @getProcessedFile(dependencyPath).then (dependencyFile)=>
-          if dependency.name == 'Property'
-            console.log(dependencyPath,@files.map((file)->file.path),@processed.map((file)->file.path))
           if dependencyFile
             dependency.def = dependency.def.replace(match[0],dependencyFile.wraped.namespace+'.'+dependencyFile.wraped.className)
     .then =>
@@ -50,10 +64,7 @@ module.exports = class Compose extends Stream
   wrapFile: (file)->
     Promise.resolve().then =>
       unless file.wraped?
-        file.wraped = {
-          className: path.basename(file.path,path.extname(file.path))
-          namespace: @opt.namespace
-        }
+        @addFileOptions(file)
         contents = String(file.contents)
         res = parse.extractDependencies(contents)
         contents = res.contents
@@ -83,7 +94,11 @@ module.exports = class Compose extends Stream
           file.contents = new Buffer(contents)
     .then =>
       file
-    
+  addFileOptions: (file)->
+    options = Object.assign({},@opt,{
+      className: path.basename(file.path,path.extname(file.path))
+    })
+    file.wraped = options;
   compose: ->
     if @files.length
       @processFile(@files[0]).then =>
@@ -93,17 +108,25 @@ module.exports = class Compose extends Stream
 
   flush: ->
     Promise.resolve().then =>
-      @push(new gutil.File({
+      file = new gutil.File({
         cwd: "",
         base: @getBase(),
         path: path.join(@getBase(),'_start.coffee'),
         contents: new Buffer(@opt.namespace + '={}')
-      }));
+      })
+      file.wraped = Object.assign({
+        special: 'start'
+      },@opt)
+      @push(file);
     .then =>
       @compose()
     .then =>
       for file in @processed
-        @push(file)
+        if file.wraped?.special == 'start' && file.wraped.namespace != @opt.namespace
+          @push(file)
+      for file in @processed
+        unless file.wraped?.special == 'end' || file.wraped?.special == 'start'
+          @push(file)
     .then =>
       contents = """
         if module?
@@ -112,9 +135,13 @@ module.exports = class Compose extends Stream
           @{{namespace}} = {{namespace}}
       """
       contents = parse.replaceOptions(@opt,contents)
-      @push(new gutil.File({
+      file = new gutil.File({
         cwd: "",
         base: @getBase(),
         path: path.join(@getBase(),'_end.coffee'),
         contents: new Buffer(contents)
-      }));
+      })
+      file.wraped = {
+        special: 'end'
+      }
+      @push(file);
