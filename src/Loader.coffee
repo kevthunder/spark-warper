@@ -20,7 +20,7 @@ module.exports = class Loader extends Stream
     @_base
 
   flush: ->
-    namespaceFile = path.join(@getBase(), @opt.namespace+'.js')
+    namespaceFile = path.join(@getBase(), (@opt.filename || @opt.namespace)+'.js')
 
     contents = 'if(module){\n'
     contents += '  module.exports = {\n'
