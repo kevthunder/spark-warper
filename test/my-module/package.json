@@ -1,0 +1,8 @@
+{
+  "name": "my-module",
+  "version": "0.1.0",
+  "description": "testting sub-modules",
+  "main": "index.js",
+  "author": "kevthunder",
+  "license": "ISC"
+}
