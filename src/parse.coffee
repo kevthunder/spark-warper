@@ -43,7 +43,7 @@ fn =
         break if i >= lines.length || (dependencyLines.length > 0 && !match)
       contents = lines.join("\n")
     dependencies = dependencyLines.map (line)->
-      match = line.match(/^((var|const)\s+)?(\w+)\s*=\s*/)
+      match = line.match(/^\s*((var|const)\s+)?(\w+)\s*=\s*/)
       unless match?
         throw new Error('spark-wrapper: malformated dependency :'+line)
       {
