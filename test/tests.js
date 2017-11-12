@@ -4,7 +4,8 @@
     return describe('compile', function() {
       require('./wrap');
       require('./loader');
-      return require('./compose');
+      require('./compose');
+      return require('./composeModule');
     });
   });
 

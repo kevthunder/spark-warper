@@ -4,4 +4,5 @@ describe 'wrapper', ->
     require('./wrap')
     require('./loader')
     require('./compose')
+    require('./composeModule')
 
