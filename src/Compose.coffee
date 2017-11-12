@@ -47,10 +47,12 @@ module.exports = class Compose extends Stream
   resolveDependency: (dependency, file)->
     match = null
     Promise.resolve().then =>
-      if match = /require\(['"]([-_\d\w]+)['"]\)((.[_\d\w])+)/.exec(dependency.def)
+      if match = /require\(['"]([-_\d\w]+)['"]\)((\.[_\d\w]+)+)/.exec(dependency.def)
         module = match[1]
         ref = match[2].substring(1)
         @getProcessedByRef(module, ref)
+          .then (dependencyFile)=>
+            dependencyFile
       else if match = /require(\(|\s*)['"]([^'"]+)['"]\)?/.exec(dependency.def)
         dependencyPath = path.resolve(path.dirname(file.path)+'/'+match[2]+path.extname(file.path))
         @getProcessedFile(dependencyPath)
