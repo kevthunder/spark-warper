@@ -39,7 +39,7 @@
         return done();
       });
     });
-    return it('compose with multiple call', function(done) {
+    it('compose with multiple call', function(done) {
       assert.notPathExists('./test/output/spark.js');
       return merge([
         gulp.src(['./test/files/_remove_require.coffee']), gulp.src(['./test/files/DependantCommentClass.coffee', './test/files/CompiledClass.coffee']).pipe(wrapper.compose({
@@ -57,6 +57,27 @@
         assert.equal(obj.hello(), 'hello', 'CompiledClass::hello');
         obj = new Spark.IndirectDependantClass();
         assert.equal(obj.hello(), 'hello', 'IndirectDependantClass::hello');
+        return done();
+      });
+    });
+    return it('compose with aliased module', function(done) {
+      return gulp.src(['./test/files/_remove_require.coffee', './test/files/CompiledClass.coffee', './test/files/ExternalDependantClass.coffee']).pipe(wrapper.compose({
+        namespace: 'Spark',
+        aliases: {
+          'my-module': 'Spark'
+        }
+      })).pipe(concat('spark.coffee')).pipe(coffee()).pipe(gulp.dest('./test/output/')).on('end', function() {
+        var Spark, obj;
+        assert.pathExists('./test/output/spark.js');
+        Spark = require('./output/spark.js');
+        assert.isFunction(Spark.CompiledClass);
+        assert.isFunction(Spark.CompiledClass.definition);
+        obj = new Spark.CompiledClass();
+        assert.equal(obj.hello(), 'hello', 'CompiledClass::hello');
+        assert.isFunction(Spark.ExternalDependantClass);
+        assert.isFunction(Spark.ExternalDependantClass.definition);
+        obj = new Spark.ExternalDependantClass();
+        assert.equal(obj.hello(), 'hello', 'ExternalDependantClass::hello');
         return done();
       });
     });
