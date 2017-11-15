@@ -54,6 +54,9 @@ fn =
     {contents:contents, dependencies:dependencies}
 
   replaceOptions: (options, contents) ->
-    contents.replace(/\{\{className\}\}/g,options.className).replace(/\{\{namespace\}\}/g,options.namespace)
+    contents
+      .replace(/\{\{className\}\}/g,options.className)
+      .replace(/\{\{varname\}\}/g,options.varname)
+      .replace(/\{\{namespace\}\}/g,options.namespace)
 
 module.exports = fn

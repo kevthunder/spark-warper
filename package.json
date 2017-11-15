@@ -25,7 +25,8 @@
     "merge2": "^1.2.0",
     "mocha": "^3.2.0",
     "my-module": "file:./test/my-module",
-    "my-module2": "file:./test/my-module2"
+    "my-module2": "file:./test/my-module2",
+    "streamqueue": "^1.1.1"
   },
   "dependencies": {
     "bluebird": "^3.5.1",
