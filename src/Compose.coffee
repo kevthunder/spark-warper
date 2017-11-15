@@ -6,10 +6,19 @@ parse = require('./parse');
 
 module.exports = class Compose extends Stream
   constructor: (options)->
-    @opt = Object.assign({exclude:/^_/},options)
+    @opt = @parseOptions(options)
     @files = []
     @processed = []
     super()
+
+  parseOptions: (options)->
+    opt = Object.assign({exclude:/^_/},options)
+    unless opt.varname?
+      opt.varname = if opt.module
+          opt.namespace
+        else
+          opt.namespace.split('.').pop()
+    opt
 
   getBase: ()->
     unless @_base
@@ -47,8 +56,8 @@ module.exports = class Compose extends Stream
   resolveDependency: (dependency, file)->
     match = null
     Promise.resolve().then =>
-      if @opt.aliases? && (match = /require(\(|\s*)['"]([^'"]+)['"]\)?/.exec(dependency.def)) && @opt.aliases[match[2]]?
-        dependency.def = dependency.def.replace(match[0],@opt.aliases[match[2]])
+      if @opt.aliases? && (match = /require(\(|\s*)['"](\.\/)?([^'"]+)['"]\)?/.exec(dependency.def)) && found = @opt.aliases[match[3]]
+        dependency.def = dependency.def.replace(match[0],found)
         null
       else if match = /require\(['"]([-_\d\w]+)['"]\)((\.[_\d\w]+)+)/.exec(dependency.def)
         module = match[1]
@@ -59,7 +68,7 @@ module.exports = class Compose extends Stream
         @getProcessedFile(dependencyPath)
     .then (dependencyFile)=>
       if dependencyFile
-        dependency.def = dependency.def.replace(match[0],dependencyFile.wrapped.namespace+'.'+dependencyFile.wrapped.className)
+        dependency.def = dependency.def.replace(match[0],dependencyFile.wrapped.varname+'.'+dependencyFile.wrapped.className)
         unless file.wrapped.dependencies
           file.wrapped.dependencies = []
         file.wrapped.dependencies.push(dependencyFile.path)
@@ -81,8 +90,8 @@ module.exports = class Compose extends Stream
         dependencies = res.dependencies
 
         before = """((definition)->
-            {{namespace}}.{{className}} = definition()
-            {{namespace}}.{{className}}.definition = definition
+            {{varname}}.{{className}} = definition()
+            {{varname}}.{{className}}.definition = definition
           )("""
         if dependencies.length
           before += '(dependencies={})->'
@@ -116,42 +125,86 @@ module.exports = class Compose extends Stream
 
   transform: @::collect
 
+  makeNamespaceCreator: (namespace,prefix='',indent='')->
+    parts = namespace.split('.');
+    createNamespace = ''
+    for part in parts
+      createNamespace+= "\n"+indent+"unless "+prefix+part+"?"
+      createNamespace+= "\n"+indent+"   "+prefix+part+" = {}"
+      prefix += part + '.'
+    createNamespace
+
+  makeStartFile: ->
+    if @opt.partOf?
+      if @opt.partOf == @opt.namespace
+        contents = """
+          {{varname}} = if module?
+            module.exports
+          else
+            @{{namespace}}
+        """
+      else
+        contents = """
+          {{varname}} = if module?
+            {{parentVarname}} = module.exports
+            {{createSubNamespace}}
+            {{parentVarname}}.{{afterParent}}
+          else
+            {{parentVarname}} = @{{partOf}}
+            {{createNamespace}}
+            @{{namespace}}
+        """
+        afterParent = @opt.namespace.substring(@opt.partOf.length+1)
+        contents = contents.replace(/\{\{partOf\}\}/g, @opt.partOf)
+        contents = contents.replace(/\{\{parentVarname\}\}/g, @opt.partOf.split('.').pop())
+        contents = contents.replace(/\{\{afterParent\}\}/g, afterParent)
+        contents = contents.replace(/\{\{createSubNamespace\}\}/g, @makeNamespaceCreator(afterParent,@opt.partOf+'.','  '))
+        contents = contents.replace(/\{\{createNamespace\}\}/g, @makeNamespaceCreator(@opt.namespace.substring(@opt.partOf.length+1),'@'+@opt.partOf+'.','  '))
+    else
+      contents = """
+        {{varname}} = if module?
+          module.exports =  {}
+        else
+          {{createNamespace}}
+          @{{namespace}}
+      """
+      contents = contents.replace(/\{\{createNamespace\}\}/g, @makeNamespaceCreator(@opt.namespace,'@','  '))
+    contents = parse.replaceOptions(@opt,contents)
+    file = new gutil.File({
+      cwd: "",
+      base: @getBase(),
+      path: path.join(@getBase(),'_start.coffee'),
+      contents: new Buffer(contents)
+    })
+    file.wrapped = Object.assign({
+      special: 'start'
+    },@opt)
+    file
+
+  makeSubStartFile: (file)->
+    if file.wrapped.namespace == @opt.namespace
+      null
+    else if file.wrapped.namespace.indexOf(@opt.namespace+'.') == 0
+      contents ="""
+        {{createNamespace}}
+      """
+      contents = contents.replace(/\{\{createNamespace\}\}/g, @makeNamespaceCreator(file.wrapped.namespace.substring(@opt.namespace.length+1),@opt.namespace+'.'))
+      contents = parse.replaceOptions(file.wrapped,contents)
+      file.contents = new Buffer(contents)
+      file
+    else
+      file
+
   flush: ->
     Promise.resolve().then =>
-      file = new gutil.File({
-        cwd: "",
-        base: @getBase(),
-        path: path.join(@getBase(),'_start.coffee'),
-        contents: new Buffer(@opt.namespace + '={}')
-      })
-      file.wrapped = Object.assign({
-        special: 'start'
-      },@opt)
-      @push(file);
+      @push(@makeStartFile());
     .then =>
       @compose()
     .then =>
       for file in @processed
-        if file.wrapped?.special == 'start' && file.wrapped.namespace != @opt.namespace
-          @push(file)
+        if file.wrapped?.special == 'start' && subStartFile = @makeSubStartFile(file)
+          @push(subStartFile)
+    .then =>
       for file in @processed
         unless file.wrapped?.special == 'end' || file.wrapped?.special == 'start'
           @push(file)
-    .then =>
-      contents = """
-        if module?
-          module.exports = {{namespace}}
-        else 
-          @{{namespace}} = {{namespace}}
-      """
-      contents = parse.replaceOptions(@opt,contents)
-      file = new gutil.File({
-        cwd: "",
-        base: @getBase(),
-        path: path.join(@getBase(),'_end.coffee'),
-        contents: new Buffer(contents)
-      })
-      file.wrapped = {
-        special: 'end'
-      }
-      @push(file);

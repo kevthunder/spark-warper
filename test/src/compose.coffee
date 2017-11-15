@@ -7,6 +7,7 @@ gulp = require('gulp')
 merge = require('merge2')
 coffee = require('gulp-coffee')
 concat = require('gulp-concat')
+streamqueue = require('streamqueue')
 
 describe 'Compose', ->
   beforeEach clearOutput
@@ -57,7 +58,7 @@ describe 'Compose', ->
       obj = new Spark.IndirectDependantClass()
       assert.equal obj.hello(), 'hello', 'IndirectDependantClass::hello'
       done()
-
+  
   it 'compose with aliased module', (done)->
       gulp.src([
         './test/files/_remove_require.coffee',
@@ -80,3 +81,31 @@ describe 'Compose', ->
         obj = new Spark.ExternalDependantClass()
         assert.equal obj.hello(), 'hello', 'ExternalDependantClass::hello'
         done()
+
+  it 'can merge many composes', (done)->
+    assert.notPathExists('./test/output/spark.js')
+    streamqueue(
+      {objectMode:true},
+      gulp.src(['./test/files/_remove_require.coffee'])
+        .pipe(coffee({bare: true})),
+      gulp.src(['./test/files/DependantCommentClass.coffee','./test/files/CompiledClass.coffee'])
+        .pipe(wrapper.compose({namespace:'Spark'}))
+        .pipe(concat('spark.coffee'))
+        .pipe(coffee()),
+      gulp.src(['./test/files/IndirectDependantClass.coffee'])
+        .pipe(wrapper.compose({namespace:'Spark.Test',aliases:{'DependantCommentClass':'Spark.DependantCommentClass'},partOf:'Spark'}))
+        .pipe(concat('spark-test.coffee'))
+        .pipe(coffee())
+    )
+    .pipe(concat('spark.js'))
+    .pipe(gulp.dest('./test/output/'))
+    .on 'end', ->
+      assert.pathExists('./test/output/spark.js')
+      Spark = require('./output/spark.js')
+      assert.isFunction(Spark.CompiledClass)
+      assert.isFunction(Spark.CompiledClass.definition)
+      obj = new Spark.CompiledClass()
+      assert.equal obj.hello(), 'hello', 'CompiledClass::hello'
+      obj = new Spark.Test.IndirectDependantClass()
+      assert.equal obj.hello(), 'hello', 'IndirectDependantClass::hello'
+      done()
