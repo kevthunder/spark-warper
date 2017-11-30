@@ -18,12 +18,12 @@ module.exports = class Wrap extends Stream
       dependencies = res.dependencies
     .then ->
       before = '(function(definition){
-          {{className}} = definition(typeof({{namespace}}) !== "undefined"?{{namespace}}:this.{{namespace}});
+          var {{className}} = definition(typeof {{namespace}} !== "undefined"?{{namespace}}:this.{{namespace}});
           {{className}}.definition = definition;
-          if (typeof(module) !== "undefined" && module !== null) {
+          if (typeof module !== "undefined" && module !== null) {
             module.exports = {{className}};
           } else {
-            if (typeof({{namespace}}) !== "undefined" && {{namespace}} !== null) {
+            if (typeof {{namespace}} !== "undefined" && {{namespace}} !== null) {
               {{namespace}}.{{className}} = {{className}};
             } else{
               if (this.{{namespace}} == null) {
@@ -34,7 +34,7 @@ module.exports = class Wrap extends Stream
           }
         })(
       '
-      before = parse.replaceOptions(options,before).replace(/\s/g,'')
+      before = parse.replaceOptions(options,before).replace(/(var|typeof)\s/g,'$1{_}').replace(/\s/g,'').replace(/\{_\}/g,' ')
       if dependencies.length
         before += 'function(dependencies){if(dependencies==null){dependencies={};}'
         for dependency in dependencies
