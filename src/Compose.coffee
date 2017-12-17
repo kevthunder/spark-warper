@@ -48,7 +48,7 @@ module.exports = class Compose extends Stream
         file
   getProcessedByRef: (module, ref)->
     find = (file)->
-      file.wrapped?.module == module && ref.indexOf(file.wrapped.className) == 0
+      file.wrapped?.module == module && (ref == file.wrapped.className || ref.indexOf(file.wrapped.className+'.') == 0)
     Promise.resolve().then =>
       if file = @files.find(find)
         @processFile(file)
