@@ -26,6 +26,7 @@
     "mocha": "^3.2.0",
     "my-module": "file:./test/my-module",
     "my-module2": "file:./test/my-module2",
+    "singleton-module": "file:./test/singleton-module",
     "streamqueue": "^1.1.1"
   },
   "dependencies": {

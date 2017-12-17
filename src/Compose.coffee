@@ -33,6 +33,8 @@ module.exports = class Compose extends Stream
           @files.splice(index, 1)
           @processed.push(file)
         file
+    else if @processed.includes(file)
+      Promise.resolve(file)
     else
       Promise.reject(new Error('this file is not in the stream'))
 
@@ -44,14 +46,24 @@ module.exports = class Compose extends Stream
         @processFile(file)
       else if file = @processed.find(find)
         file
-  getProcessedByRef: (module, ref)->
+  getProcessedByRef: (module, ref=null)->
     find = (file)->
-      file.wrapped?.module == module && ref.indexOf(file.wrapped.className) == 0
+      file.wrapped?.module == module && 
+        if ref == null
+          file.wrapped.className? && file.wrapped.className == file.wrapped.main
+        else
+          ref.indexOf(file.wrapped.className) == 0
     Promise.resolve().then =>
       if file = @files.find(find)
         @processFile(file)
       else if file = @processed.find(find)
         file
+
+  getSingletonModule: (module)->
+    find = (file)->
+      file.wrapped?.module == module && file.wrapped.className? && file.wrapped.className == file.wrapped.main
+    @files.find(find) || @processed.find(find)
+
 
   resolveDependency: (dependency, file)->
     match = null
@@ -59,6 +71,8 @@ module.exports = class Compose extends Stream
       if @opt.aliases? && (match = /require(\(|\s*)['"](\.\/)?([^'"]+)['"]\)?/.exec(dependency.def)) && found = @opt.aliases[match[3]]
         dependency.def = dependency.def.replace(match[0],found)
         null
+      else if (match = /require\(['"]([-_\d\w]+)['"]\)/.exec(dependency.def)) && singleton = @getSingletonModule(match[1])
+        @processFile(singleton)
       else if match = /require\(['"]([-_\d\w]+)['"]\)((\.[_\d\w]+)+)/.exec(dependency.def)
         module = match[1]
         ref = match[2].substring(1)

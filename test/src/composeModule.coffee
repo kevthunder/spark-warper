@@ -32,7 +32,29 @@ describe 'Compose with modules', ->
         obj = new Spark.ExternalDependantClass()
         assert.equal obj.hello(), 'hello', 'ExternalDependantClass::hello'
         done()
-        
+
+  it 'compose external singleton module', (done)->
+      merge([
+          gulp.src(['./test/files/_remove_require.coffee'])
+          wrapper.composeModule({namespace:'Spark.MyModule',module:'singleton-module',main:'CompiledClass'},'*.coffee')
+          gulp.src(['./test/files/SingletonDependantClass.coffee'])
+      ])
+      .pipe(wrapper.compose({namespace:'Spark'}))
+      .pipe(concat('spark.coffee'))
+      .pipe(coffee())
+      .pipe(gulp.dest('./test/output/'))
+      .on 'end', ->
+        assert.pathExists('./test/output/spark.js')
+        Spark = require('./output/spark.js')
+        assert.isDefined(Spark.MyModule)
+        assert.isFunction(Spark.MyModule.CompiledClass)
+        assert.isFunction(Spark.MyModule.CompiledClass.definition)
+        obj = new Spark.MyModule.CompiledClass()
+        assert.equal obj.hello(), 'hello', 'CompiledClass::hello'
+        obj = new Spark.SingletonDependantClass()
+        assert.equal obj.hello(), 'hello', 'ExternalDependantClass::hello'
+        done()
+
   it 'compose external module same namespace', (done)->
       merge([
           gulp.src(['./test/files/_remove_require.coffee'])
