@@ -131,3 +131,30 @@ describe 'Compose', ->
         obj = new Spark.NestedDependantClass()
         assert.equal obj.hello(), 'hello', 'NestedDependantClass::hello'
         done()
+
+  it 'compose Indirect dependency requested multiple times', (done)->
+    assert.notPathExists('./test/output/spark.js')
+
+    gulp.src([
+      './test/files/_remove_require.coffee'
+      './test/files/MultipleIndirectClass.coffee'
+      './test/files/IndirectDependantClass.coffee'
+      './test/files/IndirectDependantClass2.coffee'
+      './test/files/DependantCommentClass.coffee'
+      './test/files/CompiledClass.coffee'
+    ])
+    .pipe(wrapper.compose({namespace:'Spark'}))
+    .pipe(concat('spark.coffee'))
+    .pipe(coffee())
+    .pipe(gulp.dest('./test/output/'))
+    .on 'end', ->
+      assert.pathExists('./test/output/spark.js')
+      Spark = require('./output/spark.js')
+      assert.isFunction(Spark.CompiledClass)
+      assert.isFunction(Spark.CompiledClass.definition)
+      obj = new Spark.CompiledClass()
+      assert.equal obj.hello(), 'hello', 'CompiledClass::hello'
+      obj = new Spark.MultipleIndirectClass()
+      assert.equal obj.hello(), 'hello', 'MultipleIndirectClass::hello'
+      assert.equal obj.hi(), 'hello', 'MultipleIndirectClass::hi'
+      done()

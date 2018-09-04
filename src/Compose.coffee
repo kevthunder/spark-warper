@@ -89,9 +89,10 @@ module.exports = class Compose extends Stream
   wrapFile: (file)->
     Promise.resolve().then =>
       if file.wrapped?
-        if file.wrapped.dependencies
-          Promise.all file.wrapped.dependencies.map (dependency)=>
-            @getProcessedFile(dependency)
+        (file.wrapped.promise || Promise.resolve()).then =>
+          if file.wrapped.dependencies
+            Promise.all file.wrapped.dependencies.map (dependency)=>
+              @getProcessedFile(dependency)
       else if !path.basename(file.path).match(@opt.exclude)
         @addFileOptions(file)
         contents = String(file.contents)
@@ -109,7 +110,7 @@ module.exports = class Compose extends Stream
           before += '->'
         before = parse.replaceOptions(file.wrapped,before)
 
-        Promise.map(dependencies, (dependency)=>@resolveDependency(dependency,file)).then (dependencies)=>
+        file.wrapped.promise = Promise.map(dependencies, (dependency)=>@resolveDependency(dependency,file)).then (dependencies)=>
           for dependency in dependencies
             before += dependency
 

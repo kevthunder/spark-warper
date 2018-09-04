@@ -113,7 +113,7 @@
         return done();
       });
     });
-    return it('compose and concat files with folder', function(done) {
+    it('compose and concat files with folder', function(done) {
       assert.notPathExists('./test/output/spark.js');
       return gulp.src(['./test/files/_remove_require.coffee', './test/files/Nested/NestedDependantClass.coffee', './test/files/CompiledClass.coffee']).pipe(wrapper.compose({
         namespace: 'Spark'
@@ -127,6 +127,24 @@
         assert.equal(obj.hello(), 'hello', 'CompiledClass::hello');
         obj = new Spark.NestedDependantClass();
         assert.equal(obj.hello(), 'hello', 'NestedDependantClass::hello');
+        return done();
+      });
+    });
+    return it('compose Indirect dependency requested multiple times', function(done) {
+      assert.notPathExists('./test/output/spark.js');
+      return gulp.src(['./test/files/_remove_require.coffee', './test/files/MultipleIndirectClass.coffee', './test/files/IndirectDependantClass.coffee', './test/files/IndirectDependantClass2.coffee', './test/files/DependantCommentClass.coffee', './test/files/CompiledClass.coffee']).pipe(wrapper.compose({
+        namespace: 'Spark'
+      })).pipe(concat('spark.coffee')).pipe(coffee()).pipe(gulp.dest('./test/output/')).on('end', function() {
+        var Spark, obj;
+        assert.pathExists('./test/output/spark.js');
+        Spark = require('./output/spark.js');
+        assert.isFunction(Spark.CompiledClass);
+        assert.isFunction(Spark.CompiledClass.definition);
+        obj = new Spark.CompiledClass();
+        assert.equal(obj.hello(), 'hello', 'CompiledClass::hello');
+        obj = new Spark.MultipleIndirectClass();
+        assert.equal(obj.hello(), 'hello', 'MultipleIndirectClass::hello');
+        assert.equal(obj.hi(), 'hello', 'MultipleIndirectClass::hi');
         return done();
       });
     });
