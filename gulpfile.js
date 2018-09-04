@@ -15,12 +15,12 @@ gulp.task('coffee', function() {
     .pipe(gulp.dest('./lib/'));
 });
 
-gulp.task('compress', ['coffee'], function () {
+gulp.task('compress', gulp.series('coffee', function () {
   return gulp.src('./dist/spark-wrapper.js')
     .pipe(uglify())
     .pipe(rename('spark-wrapper.min.js'))
     .pipe(gulp.dest('./dist/'));
-});
+}));
 
 gulp.task('coffeeTest', function() {
   return gulp.src('./test/src/*.coffee')
@@ -30,18 +30,18 @@ gulp.task('coffeeTest', function() {
     .pipe(gulp.dest('./test/'));
 });
 
-gulp.task('build', ['coffee', 'compress'], function () {
+gulp.task('build', gulp.series('coffee', 'compress', function () {
     console.log('Build Complete');
-});
+}));
 
-gulp.task('test', ['coffee','coffeeTest'], function() {
+gulp.task('test', gulp.series('coffee','coffeeTest', function() {
   return gulp.src('./test/tests.js')
     .pipe(mocha({require:['source-map-support/register']}));
-});
+}));
 
-gulp.task('test-debug', ['coffee','coffeeTest'], function() {
+gulp.task('test-debug', gulp.series('coffee','coffeeTest', function() {
   return gulp.src('./test/tests.js')
     .pipe(mocha({"inspect-brk":true, require:['source-map-support/register']}));
-});
+}));
 
-gulp.task('default', ['build']);
+gulp.task('default', gulp.series('build'));
