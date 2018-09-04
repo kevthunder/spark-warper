@@ -1,6 +1,6 @@
 {
   "name": "spark-wrapper",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Wrap your class for exporting with gulp",
   "main": "lib/spark-wrapper.js",
   "repository": {
