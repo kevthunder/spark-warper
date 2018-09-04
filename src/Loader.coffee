@@ -1,9 +1,9 @@
-Promise = require('bluebird');
-path = require('path');
-gutil = require('gulp-util');
-upath = require('upath');
-Stream = require('./Stream');
-parse = require('./parse');
+Promise = require('bluebird')
+path = require('path')
+Vinyl = require('vinyl')
+upath = require('upath')
+Stream = require('./Stream')
+parse = require('./parse')
 
 module.exports = class Loader extends Stream
   constructor: (options)->
@@ -34,7 +34,7 @@ module.exports = class Loader extends Stream
     @files.forEach (file)=>
       this.push(file)
 
-    this.push(new gutil.File({
+    this.push(new Vinyl({
       cwd: "",
       base: @getBase(),
       path: namespaceFile,

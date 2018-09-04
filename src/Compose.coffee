@@ -1,8 +1,8 @@
-Promise = require('bluebird');
-path = require('path');
-gutil = require('gulp-util');
-Stream = require('./Stream');
-parse = require('./parse');
+Promise = require('bluebird')
+path = require('path')
+Vinyl = require('vinyl')
+Stream = require('./Stream')
+parse = require('./parse')
 
 module.exports = class Compose extends Stream
   constructor: (options)->
@@ -180,7 +180,7 @@ module.exports = class Compose extends Stream
       """
       contents = contents.replace(/\{\{createNamespace\}\}/g, @makeNamespaceCreator(@opt.namespace,'@','  '))
     contents = parse.replaceOptions(@opt,contents)
-    file = new gutil.File({
+    file = new Vinyl({
       cwd: "",
       base: @getBase(),
       path: path.join(@getBase(),'_start.coffee'),
