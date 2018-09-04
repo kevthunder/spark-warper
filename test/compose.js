@@ -44,9 +44,12 @@
     it('compose with multiple call', function(done) {
       assert.notPathExists('./test/output/spark.js');
       return merge([
-        gulp.src(['./test/files/_remove_require.coffee']), gulp.src(['./test/files/DependantCommentClass.coffee', './test/files/CompiledClass.coffee']).pipe(wrapper.compose({
+        gulp.src(['./test/files/_remove_require.coffee']),
+        gulp.src(['./test/files/DependantCommentClass.coffee',
+        './test/files/CompiledClass.coffee']).pipe(wrapper.compose({
           namespace: 'Spark'
-        })), gulp.src(['./test/files/IndirectDependantClass.coffee'])
+        })),
+        gulp.src(['./test/files/IndirectDependantClass.coffee'])
       ]).pipe(wrapper.compose({
         namespace: 'Spark'
       })).pipe(concat('spark.coffee')).pipe(coffee()).pipe(gulp.dest('./test/output/')).on('end', function() {
@@ -83,7 +86,7 @@
         return done();
       });
     });
-    return it('can merge many composes', function(done) {
+    it('can merge many composes', function(done) {
       assert.notPathExists('./test/output/spark.js');
       return streamqueue({
         objectMode: true
@@ -110,6 +113,25 @@
         return done();
       });
     });
+    return it('compose and concat files with folder', function(done) {
+      assert.notPathExists('./test/output/spark.js');
+      return gulp.src(['./test/files/_remove_require.coffee', './test/files/Nested/NestedDependantClass.coffee', './test/files/CompiledClass.coffee']).pipe(wrapper.compose({
+        namespace: 'Spark'
+      })).pipe(concat('spark.coffee')).pipe(coffee()).pipe(gulp.dest('./test/output/')).on('end', function() {
+        var Spark, obj;
+        assert.pathExists('./test/output/spark.js');
+        Spark = require('./output/spark.js');
+        assert.isFunction(Spark.CompiledClass);
+        assert.isFunction(Spark.CompiledClass.definition);
+        obj = new Spark.CompiledClass();
+        assert.equal(obj.hello(), 'hello', 'CompiledClass::hello');
+        obj = new Spark.NestedDependantClass();
+        assert.equal(obj.hello(), 'hello', 'NestedDependantClass::hello');
+        return done();
+      });
+    });
   });
 
 }).call(this);
+
+//# sourceMappingURL=maps/compose.js.map

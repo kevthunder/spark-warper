@@ -6,10 +6,10 @@ parse = require('./parse');
 
 module.exports = class Compose extends Stream
   constructor: (options)->
+    super()
     @opt = @parseOptions(options)
     @files = []
     @processed = []
-    super()
 
   parseOptions: (options)->
     opt = Object.assign({exclude:/^_/},options)

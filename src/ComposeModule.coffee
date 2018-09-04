@@ -7,8 +7,8 @@ Stream = require('./Stream');
 
 module.exports = class ComposeModule extends Stream
   constructor: (options,@src)->
-    @opt = Object.assign(options)
     super()
+    @opt = Object.assign(options)
     @piped = false
     this.on 'pipe', => 
       @piped = true

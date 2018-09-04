@@ -109,3 +109,25 @@ describe 'Compose', ->
       obj = new Spark.Test.IndirectDependantClass()
       assert.equal obj.hello(), 'hello', 'IndirectDependantClass::hello'
       done()
+
+  it 'compose and concat files with folder', (done)->
+    assert.notPathExists('./test/output/spark.js')
+    gulp.src([
+      './test/files/_remove_require.coffee'
+      './test/files/Nested/NestedDependantClass.coffee'
+      './test/files/CompiledClass.coffee'
+    ])
+      .pipe(wrapper.compose({namespace:'Spark'}))
+      .pipe(concat('spark.coffee'))
+      .pipe(coffee())
+      .pipe(gulp.dest('./test/output/'))
+      .on 'end', ->
+        assert.pathExists('./test/output/spark.js')
+        Spark = require('./output/spark.js')
+        assert.isFunction(Spark.CompiledClass)
+        assert.isFunction(Spark.CompiledClass.definition)
+        obj = new Spark.CompiledClass()
+        assert.equal obj.hello(), 'hello', 'CompiledClass::hello'
+        obj = new Spark.NestedDependantClass()
+        assert.equal obj.hello(), 'hello', 'NestedDependantClass::hello'
+        done()

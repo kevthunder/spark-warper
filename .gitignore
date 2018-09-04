@@ -2,4 +2,4 @@
 /tmp
 /npm-debug.log
 /test/output
-/package-lock.json
+*.map

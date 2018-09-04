@@ -38,7 +38,8 @@
         {
           name: 'Path',
           def: "require('path');"
-        }, {
+        },
+        {
           name: 'hello',
           def: "'hello';"
         }
@@ -53,7 +54,8 @@
         {
           name: 'Foo',
           def: "require('foo');"
-        }, {
+        },
+        {
           name: 'Bar',
           def: "require('bar');"
         }
@@ -68,7 +70,8 @@
         {
           name: 'Foo',
           def: "require('foo');"
-        }, {
+        },
+        {
           name: 'Bar',
           def: "require('bar');"
         }
@@ -83,7 +86,8 @@
         {
           name: 'Foo',
           def: "require('foo')"
-        }, {
+        },
+        {
           name: 'Bar',
           def: "require('./bar')"
         }
@@ -93,3 +97,5 @@
   });
 
 }).call(this);
+
+//# sourceMappingURL=maps/parse.js.map

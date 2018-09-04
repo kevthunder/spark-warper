@@ -23,10 +23,13 @@
     beforeEach(clearOutput);
     it('compose external module', function(done) {
       return merge([
-        gulp.src(['./test/files/_remove_require.coffee']), wrapper.composeModule({
+        gulp.src(['./test/files/_remove_require.coffee']),
+        wrapper.composeModule({
           namespace: 'Spark.MyModule',
           module: 'my-module'
-        }, '*.coffee'), gulp.src(['./test/files/ExternalDependantClass.coffee'])
+        },
+        '*.coffee'),
+        gulp.src(['./test/files/ExternalDependantClass.coffee'])
       ]).pipe(wrapper.compose({
         namespace: 'Spark'
       })).pipe(concat('spark.coffee')).pipe(coffee()).pipe(gulp.dest('./test/output/')).on('end', function() {
@@ -45,11 +48,14 @@
     });
     it('compose external singleton module', function(done) {
       return merge([
-        gulp.src(['./test/files/_remove_require.coffee']), wrapper.composeModule({
+        gulp.src(['./test/files/_remove_require.coffee']),
+        wrapper.composeModule({
           namespace: 'Spark.MyModule',
           module: 'singleton-module',
           main: 'CompiledClass'
-        }, '*.coffee'), gulp.src(['./test/files/SingletonDependantClass.coffee'])
+        },
+        '*.coffee'),
+        gulp.src(['./test/files/SingletonDependantClass.coffee'])
       ]).pipe(wrapper.compose({
         namespace: 'Spark'
       })).pipe(concat('spark.coffee')).pipe(coffee()).pipe(gulp.dest('./test/output/')).on('end', function() {
@@ -68,10 +74,13 @@
     });
     it('compose external module same namespace', function(done) {
       return merge([
-        gulp.src(['./test/files/_remove_require.coffee']), wrapper.composeModule({
+        gulp.src(['./test/files/_remove_require.coffee']),
+        wrapper.composeModule({
           namespace: 'Spark',
           module: 'my-module'
-        }, '*.coffee'), gulp.src(['./test/files/ExternalDependantClass.coffee'])
+        },
+        '*.coffee'),
+        gulp.src(['./test/files/ExternalDependantClass.coffee'])
       ]).pipe(wrapper.compose({
         namespace: 'Spark'
       })).pipe(concat('spark.coffee')).pipe(coffee()).pipe(gulp.dest('./test/output/')).on('end', function() {
@@ -89,13 +98,17 @@
     });
     return it('compose interdependant modules', function(done) {
       return merge([
-        gulp.src(['./test/files/_remove_require.coffee']), wrapper.composeModule({
+        gulp.src(['./test/files/_remove_require.coffee']),
+        wrapper.composeModule({
           namespace: 'Spark',
           module: 'my-module'
-        }, '*.coffee').pipe(wrapper.composeModule({
+        },
+        '*.coffee').pipe(wrapper.composeModule({
           namespace: 'Spark',
           module: 'my-module2'
-        }, '*.coffee')), gulp.src(['./test/files/ExternalDependantClass.coffee'])
+        },
+        '*.coffee')),
+        gulp.src(['./test/files/ExternalDependantClass.coffee'])
       ]).pipe(wrapper.compose({
         namespace: 'Spark'
       })).pipe(concat('spark.coffee')).pipe(coffee()).pipe(gulp.dest('./test/output/')).on('end', function() {
@@ -116,3 +129,5 @@
   });
 
 }).call(this);
+
+//# sourceMappingURL=maps/composeModule.js.map
